@@ -4,6 +4,7 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.EntityID
 import org.jetbrains.exposed.dao.LongIdTable
 import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.sql.Connection
 
@@ -21,19 +22,34 @@ object PinDB {
     }
 
     fun recordPinning(pinboardPostId: Snowflake, author: Snowflake, pinnedPost: Snowflake, pinCount: Int) {
-        TODO()
+        PinboardPost.new {
+            this.pinboardPost = EntityID(pinboardPostId.asLong(), PinboardPosts)
+            this.author = author.asLong()
+            this.pinnedPost = pinnedPost.asLong()
+            this.pinCount = pinCount
+        }
     }
 
     fun removePinning(pinboardPostId: Snowflake) {
-        TODO()
+        PinboardPosts.deleteWhere {
+            PinboardPosts.id eq pinboardPostId.asLong()
+        }
     }
 
-    fun updatePinCount(pinboardPostId: Snowflake, pinCount: Int) {
-        TODO()
+    fun updatePinCount(pinnedPost: Snowflake, pinCount: Int) {
+        PinboardPost.find {
+            PinboardPosts.pinnedPost eq pinnedPost.asLong()
+        }.firstOrNull()?.let {
+            it.pinCount = pinCount
+        }
     }
 
     fun findPinboardPost(pinnedPost: Snowflake): Snowflake? {
-        TODO()
+        return PinboardPost.find {
+            PinboardPosts.pinnedPost eq pinnedPost.asLong()
+        }.firstOrNull()?.pinboardPost?.let {
+            Snowflake.of(it.value)
+        }
     }
 
 }
@@ -41,14 +57,14 @@ object PinDB {
 object PinboardPosts : LongIdTable() {
     val author = long("author")
     val pinnedPost = long("pinned_post")
-    val pinCount = long("pin_count")
+    val pinCount = integer("pin_count")
 }
 
 class PinboardPost(pinboardPost: EntityID<Long>) : Entity<Long>(pinboardPost) {
     companion object : EntityClass<Long, PinboardPost>(PinboardPosts)
 
-    val pinboardPost by PinboardPosts.id
-    val author by PinboardPosts.author
-    val pinnedPost by PinboardPosts.pinnedPost
-    val pinCount by PinboardPosts.pinCount
+    var pinboardPost by PinboardPosts.id
+    var author by PinboardPosts.author
+    var pinnedPost by PinboardPosts.pinnedPost
+    var pinCount by PinboardPosts.pinCount
 }
