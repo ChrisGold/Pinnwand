@@ -7,7 +7,7 @@ class Pinboard(val guild: String, val guildId: Snowflake, val pinboardChannelId:
     operator fun invoke(client: DiscordClient, reactionAddEvent: ReactionAddEvent) =
         reactionAddEvent.message.subscribe {
             val pinReaction = it.reactions.firstOrNull { isPinEmoji(it.emoji) }
-            if (pinReaction != null && pinReaction.count >= 5) {
+            if (pinReaction != null && pinReaction.count >= 1) {
                 //TODO: Pin to board
                 val pinboardPost = PinDB.findPinboardPost(it.id)
                 when (pinboardPost) {
