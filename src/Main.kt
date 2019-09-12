@@ -18,9 +18,18 @@ fun main(args: Array<String>) {
         val pinReaction = it.reactions.firstOrNull { isPinEmoji(it.emoji) }
         if (pinReaction != null && pinReaction.count >= 5) {
             //TODO: Pin to board
-            val message = it.content.k
-            val author = it.author.k?.username
-            logger.info("Pinned: $message by $author")
+            val pinboardPost = PinDB.findPinboardPost(it.id)
+            when (pinboardPost) {
+                null -> {
+                    println("Pinning $it")
+                    //TODO: Pin post to the board
+                    //TODO: Create PinDB entry
+                }
+                else -> {
+                    //TODO: Update number of pins on the board
+                    PinDB.updatePinCount(pinboardPost, pinReaction.count)
+                }
+            }
         }
     }
 
@@ -31,13 +40,14 @@ fun main(args: Array<String>) {
     }.subscribe {
         val pinReaction = it.reactions.firstOrNull { isPinEmoji(it.emoji) }
         if (pinReaction == null || pinReaction.count < 5) {
-            //TODO: Unpin from board
-            val message = it.content.k
-            val author = it.author.k?.username
-            logger.info("Unpinned: $message by $author")
+            val pinboardPost = PinDB.findPinboardPost(it.id)
+            if (pinboardPost != null) {
+                println("Unpinning $it")
+                //TODO: Delete pinboardPost from DB
+                //TODO: Delete post from channel
+            }
         }
     }
-
     client.login().block()
 }
 
