@@ -1,0 +1,5 @@
+token: discord.token.txt
+guilds:
+  - guild: Astral Liberalism
+    guildId: 123
+    pinChannel:
