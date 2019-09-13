@@ -4,7 +4,7 @@ import discord4j.core.`object`.util.Snowflake
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
 
-class Pinboard(val guild: String, val guildId: Snowflake, val pinboardChannelId: Snowflake, val pinThreshold: Int = 1) {
+class Pinboard(val guild: String, val guildId: Snowflake, val pinboardChannelId: Snowflake, val pinThreshold: Int = 5) {
     operator fun invoke(client: DiscordClient, reactionAddEvent: ReactionAddEvent) =
         reactionAddEvent.message.subscribe { message ->
             val pinReaction = message.reactions.firstOrNull { isPinEmoji(it.emoji) }
@@ -29,15 +29,21 @@ class Pinboard(val guild: String, val guildId: Snowflake, val pinboardChannelId:
         }
 
     operator fun invoke(client: DiscordClient, reactionRemoveEvent: ReactionRemoveEvent) =
-        reactionRemoveEvent.message.subscribe {
-            val pinReaction = it.reactions.firstOrNull { isPinEmoji(it.emoji) }
+        reactionRemoveEvent.message.subscribe { message ->
+            val pinReaction = message.reactions.firstOrNull { isPinEmoji(it.emoji) }
+            val messageId = message.id
+            val author = message.author.k?.id
+            val content = message.content.k
+            val pinboardPost = PinDB.findPinboardPost(message.id)
             if (pinReaction == null || pinReaction.count < pinThreshold) {
-                val pinboardPost = PinDB.findPinboardPost(it.id)
                 if (pinboardPost != null) {
-                    println("Unpinning $it")
+                    println("Unpinning $message")
                     PinDB.removePinning(pinboardPost)
                     deletePinPost(client, pinboardPost)
                 }
+            } else if (pinboardPost != null && pinReaction.count >= pinThreshold) {
+                updatePinPost(client, pinboardPost, content, message.author.k?.username, pinReaction.count)
+                PinDB.updatePinCount(pinboardPost, pinReaction.count)
             }
         }
 
