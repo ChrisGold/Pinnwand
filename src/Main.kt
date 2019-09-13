@@ -1,4 +1,5 @@
 import discord4j.core.`object`.reaction.ReactionEmoji
+import discord4j.core.event.domain.message.MessageDeleteEvent
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
 import org.apache.logging.log4j.LogManager
@@ -22,6 +23,12 @@ fun main(args: Array<String>) {
         isPinEmoji(it.emoji)
     }.subscribe {
         it.guildId.k?.let { guildId -> pinboards[guildId]?.let { pinboard -> pinboard(it) } }
+    }
+
+    //Listen to deleted messages
+    client.eventDispatcher.on(MessageDeleteEvent::class.java).subscribe { deletion ->
+        //MessageDeleteEvent doesn't include the guild, so we send this event to every guild we have
+        pinboards.values.forEach { it(deletion) }
     }
 
     //Login

@@ -1,6 +1,7 @@
 import discord4j.core.DiscordClient
 import discord4j.core.`object`.entity.MessageChannel
 import discord4j.core.`object`.util.Snowflake
+import discord4j.core.event.domain.message.MessageDeleteEvent
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
 
@@ -63,6 +64,14 @@ class Pinboard(
                 PinDB.updatePinCount(pinboardPost, pinReaction.count)
             }
         }
+
+    operator fun invoke(messageDeleteEvent: MessageDeleteEvent) {
+        val messageId = messageDeleteEvent.messageId
+        PinDB.findPinboardPost(messageId)?.let {
+            PinDB.removePinning(it)
+            deletePinPost(client, it)
+        }
+    }
 
     fun createPinPost(client: DiscordClient, message: String?, author: String?, pinCount: Int?): Snowflake {
         val channel = client.getChannelById(pinboardChannelId).block() as MessageChannel
