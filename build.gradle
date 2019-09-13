@@ -30,6 +30,8 @@ sourceSets {
     test.kotlin.srcDirs = []
     main.java.srcDirs += 'src/'
     test.java.srcDirs = []
+    main.resources.srcDir('res/')
+    test.resources.srcDirs = []
 }
 
 compileKotlin {
