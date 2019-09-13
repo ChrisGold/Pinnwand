@@ -1,23 +1,27 @@
 import discord4j.core.DiscordClient
+import discord4j.core.`object`.entity.MessageChannel
 import discord4j.core.`object`.util.Snowflake
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
 
-class Pinboard(val guild: String, val guildId: Snowflake, val pinboardChannelId: Snowflake) {
+class Pinboard(val guild: String, val guildId: Snowflake, val pinboardChannelId: Snowflake, val pinThreshold: Int = 1) {
     operator fun invoke(client: DiscordClient, reactionAddEvent: ReactionAddEvent) =
-        reactionAddEvent.message.subscribe {
-            val pinReaction = it.reactions.firstOrNull { isPinEmoji(it.emoji) }
-            if (pinReaction != null && pinReaction.count >= 1) {
+        reactionAddEvent.message.subscribe { message ->
+            val pinReaction = message.reactions.firstOrNull { isPinEmoji(it.emoji) }
+            val messageId = message.id
+            val author = message.author.k?.id
+            val content = message.content.k
+            if (pinReaction != null && author != null && pinReaction.count >= pinThreshold) {
                 //TODO: Pin to board
-                val pinboardPost = PinDB.findPinboardPost(it.id)
+                val pinboardPost = PinDB.findPinboardPost(message.id)
                 when (pinboardPost) {
                     null -> {
-                        println("Pinning $it")
-                        //TODO: Pin post to the board
-                        //TODO: Create PinDB entry
+                        println("Pinning $message")
+                        val pinboardPost = createPinPost(client, content, message.author.k?.username, pinReaction.count)
+                        PinDB.recordPinning(pinboardPost, author, messageId, pinReaction.count)
                     }
                     else -> {
-                        //TODO: Update number of pins on the board
+                        updatePinPost(client, pinboardPost, content, message.author.k?.username, pinReaction.count)
                         PinDB.updatePinCount(pinboardPost, pinReaction.count)
                     }
                 }
@@ -27,26 +31,53 @@ class Pinboard(val guild: String, val guildId: Snowflake, val pinboardChannelId:
     operator fun invoke(client: DiscordClient, reactionRemoveEvent: ReactionRemoveEvent) =
         reactionRemoveEvent.message.subscribe {
             val pinReaction = it.reactions.firstOrNull { isPinEmoji(it.emoji) }
-            if (pinReaction == null || pinReaction.count < 5) {
+            if (pinReaction == null || pinReaction.count < pinThreshold) {
                 val pinboardPost = PinDB.findPinboardPost(it.id)
                 if (pinboardPost != null) {
                     println("Unpinning $it")
-                    //TODO: Delete pinboardPost from DB
-                    //TODO: Delete post from channel
+                    PinDB.removePinning(pinboardPost)
+                    deletePinPost(client, pinboardPost)
                 }
             }
         }
 
-    fun createPinPost(client: DiscordClient, message: String, author: String, pinCount: Int): Snowflake {
-        TODO()
+    fun createPinPost(client: DiscordClient, message: String?, author: String?, pinCount: Int?): Snowflake {
+        val channel = client.getChannelById(pinboardChannelId).block() as MessageChannel
+        val pinMessage = """
+            Pinned comment:
+            
+            $message
+            
+            by $author
+            ($pinCount pins)
+        """.trimIndent()
+        val message = channel.createMessage(pinMessage).block()
+        return message.id
     }
 
-    fun updatePinPost(client: DiscordClient, pinboardPost: Snowflake, message: String, author: String, pinCount: Int) {
-        TODO()
+    fun updatePinPost(
+        client: DiscordClient,
+        pinboardPost: Snowflake,
+        message: String?,
+        author: String?,
+        pinCount: Int?
+    ) {
+        val originalMessage = client.getMessageById(pinboardChannelId, pinboardPost).block()
+        val pinMessage = """
+            Pinned comment:
+            
+            $message
+            
+            by $author
+            ($pinCount pins)
+        """.trimIndent()
+        originalMessage.edit {
+            it.setContent(pinMessage)
+        }
     }
 
     fun deletePinPost(client: DiscordClient, pinboardPost: Snowflake) {
-        TODO()
+        client.getMessageById(pinboardChannelId, pinboardPost).block().delete()
     }
 }
 
