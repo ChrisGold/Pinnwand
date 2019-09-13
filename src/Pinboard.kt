@@ -33,7 +33,8 @@ class Pinboard(
                     null -> {
                         //Post hasn't been pinned yet
                         println("Pinning $message")
-                        val pinboardPost = createPinPost(client, content, channelId, authorId, pinReaction.count, image)
+                        val pinboardPost =
+                            createPinPost(client, content, messageId, channelId, authorId, pinReaction.count, image)
                         PinDB.recordPinning(pinboardPost, authorId, messageId, pinReaction.count)
                     }
                     else -> {
@@ -42,6 +43,7 @@ class Pinboard(
                             client,
                             pinboardPost,
                             content,
+                            messageId,
                             channelId,
                             authorId,
                             pinReaction.count,
@@ -71,7 +73,16 @@ class Pinboard(
                     deletePinPost(client, pinboardPost)
                 }
             } else if (pinboardPost != null && pinReaction.count >= pinThreshold) {
-                updatePinPost(client, pinboardPost, content, channelId, author?.id, pinReaction.count, image)
+                updatePinPost(
+                    client,
+                    pinboardPost,
+                    content,
+                    message.id,
+                    channelId,
+                    author?.id,
+                    pinReaction.count,
+                    image
+                )
                 PinDB.updatePinCount(pinboardPost, pinReaction.count)
             }
         }
@@ -87,17 +98,22 @@ class Pinboard(
     fun createPinPost(
         client: DiscordClient,
         message: String?,
+        messageId: Snowflake,
         channel: Snowflake?,
         author: Snowflake?,
         pinCount: Int?,
         image: Embed.Image?
     ): Snowflake {
         val pinboardChannel = client.getChannelById(pinboardChannelId).block() as MessageChannel
+        val link = channel?.let {
+            "https://discordapp.com/channels/${guildId.asString()}/${channel.asString()}/${messageId.asString()}"
+        }
         val channel = "<#${channel?.asString()}>"
         val mention = "<@!${author?.asString()}>"
         val message = pinboardChannel.createMessage {
             it.setContent("A post from $mention was pinned.")
             it.setEmbed { embed ->
+                embed.setDescription("[Link to Post]($link)")
                 embed.addField("Content", message, false)
                 embed.addField("Author", mention, true)
                 embed.addField("Channel", channel, true)
@@ -113,17 +129,22 @@ class Pinboard(
         client: DiscordClient,
         pinboardPost: Snowflake,
         message: String?,
+        messageId: Snowflake,
         channel: Snowflake?,
         author: Snowflake?,
         pinCount: Int?,
         image: Embed.Image?
     ) {
+        val link = channel?.let {
+            "https://discordapp.com/channels/${guildId.asString()}/${channel.asString()}/${messageId.asString()}"
+        }
         val originalMessage = client.getMessageById(pinboardChannelId, pinboardPost).block()
         val mention = "<@!${author?.asString()}>"
         val channel = "<#${channel?.asString()}>"
         originalMessage.edit {
             it.setContent("A post from $mention was pinned.")
             it.setEmbed { embed ->
+                embed.setDescription("[Link to Post]($link)")
                 embed.addField("Content", message, false)
                 embed.addField("Author", mention, true)
                 embed.addField("Channel", channel, true)
@@ -137,4 +158,3 @@ class Pinboard(
         client.getMessageById(pinboardChannelId, pinboardPost).block().delete().block()
     }
 }
-
