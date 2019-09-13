@@ -25,11 +25,15 @@ class Pinboard(
                 when (pinboardPost) {
                     null -> {
                         //Post hasn't been pinned yet
-                        pin(pinPostData)
+                        if (pinPostData.pinCount >= pinThreshold) {
+                            pin(pinPostData)
+                        }
                     }
                     else -> {
                         //Post has been pinned already
-                        update(pinPostData, pinboardPost)
+                        if (pinPostData.pinCount >= pinThreshold) {
+                            update(pinPostData, pinboardPost)
+                        }
                     }
                 }
             }
