@@ -9,7 +9,7 @@
         <Root level="off">
             <AppenderRef ref="Console"/>
         </Root>
-        <Logger name="eu.goldapp.Pinnwand" level="trace">
+        <Logger name="eu.goldapp.Pinnwand" level="trace" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
     </Loggers>
