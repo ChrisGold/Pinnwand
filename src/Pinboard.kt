@@ -1,4 +1,5 @@
 import discord4j.core.DiscordClient
+import discord4j.core.`object`.Embed
 import discord4j.core.`object`.entity.MessageChannel
 import discord4j.core.`object`.util.Snowflake
 import discord4j.core.event.domain.message.MessageDeleteEvent
@@ -21,8 +22,8 @@ class Pinboard(
             val messageId = message.id
             val author = message.author.k
             val authorId = author?.id
-            val authorName = author?.username
             val content = message.content.k
+            val image = message.embeds.getOrNull(0)?.image?.k
             //Should the post be pinned at all?
             if (pinReaction != null && authorId != null && pinReaction.count >= pinThreshold) {
                 //Has the post been pinned before?
@@ -31,12 +32,19 @@ class Pinboard(
                     null -> {
                         //Post hasn't been pinned yet
                         println("Pinning $message")
-                        val pinboardPost = createPinPost(client, content, authorName, pinReaction.count)
+                        val pinboardPost = createPinPost(client, content, authorId, pinReaction.count, image)
                         PinDB.recordPinning(pinboardPost, authorId, messageId, pinReaction.count)
                     }
                     else -> {
                         //Post has been pinned already
-                        updatePinPost(client, pinboardPost, content, message.author.k?.username, pinReaction.count)
+                        updatePinPost(
+                            client,
+                            pinboardPost,
+                            content,
+                            authorId,
+                            pinReaction.count,
+                            image
+                        )
                         PinDB.updatePinCount(pinboardPost, pinReaction.count)
                     }
                 }
@@ -52,7 +60,7 @@ class Pinboard(
             val content = message.content.k
             val pinboardPost = PinDB.findPinboardPost(message.id)
             val author = message.author.k
-            val authorName = author?.username
+            val image = message.embeds.getOrNull(0)?.image?.k
             if (pinReaction == null || pinReaction.count < pinThreshold) {
                 if (pinboardPost != null) {
                     println("Unpinning $message")
@@ -60,7 +68,7 @@ class Pinboard(
                     deletePinPost(client, pinboardPost)
                 }
             } else if (pinboardPost != null && pinReaction.count >= pinThreshold) {
-                updatePinPost(client, pinboardPost, content, authorName, pinReaction.count)
+                updatePinPost(client, pinboardPost, content, author?.id, pinReaction.count, image)
                 PinDB.updatePinCount(pinboardPost, pinReaction.count)
             }
         }
@@ -73,34 +81,48 @@ class Pinboard(
         }
     }
 
-    fun createPinPost(client: DiscordClient, message: String?, author: String?, pinCount: Int?): Snowflake {
+    fun createPinPost(
+        client: DiscordClient,
+        message: String?,
+        author: Snowflake?,
+        pinCount: Int?,
+        image: Embed.Image?
+    ): Snowflake {
         val channel = client.getChannelById(pinboardChannelId).block() as MessageChannel
-        val pinMessage = """
-            Pinned comment:
-            
-            $message
-            
-            by $author
-            ($pinCount pins)
-        """.trimIndent()
-        val message = channel.createMessage(pinMessage).block()
+        val mention = "<@!${author?.asString()}>"
+        val message = channel.createMessage {
+            it.setContent("Users liked a message by $mention so much they pinned it!")
+            it.setEmbed { embed ->
+                embed.addField("Content", message, false)
+                embed.addField("Author", mention, true)
+                embed.addField("Channel", "TBI", true)
+                embed.setFooter("$pin $pinCount pushpins", null)
+                image?.url?.let { embed.setImage(it) }
+            }
+        }.block()
+
         return message.id
     }
 
     fun updatePinPost(
-        client: DiscordClient, pinboardPost: Snowflake, message: String?, author: String?, pinCount: Int?
+        client: DiscordClient,
+        pinboardPost: Snowflake,
+        message: String?,
+        author: Snowflake?,
+        pinCount: Int?,
+        image: Embed.Image?
     ) {
         val originalMessage = client.getMessageById(pinboardChannelId, pinboardPost).block()
-        val pinMessage = """
-            Pinned comment:
-            
-            $message
-            
-            by $author
-            ($pinCount pins)
-        """.trimIndent()
+        val mention = "<@!${author?.asString()}>"
         originalMessage.edit {
-            it.setContent(pinMessage)
+            it.setContent("Users liked a message by $mention so much they pinned it!")
+            it.setEmbed { embed ->
+                embed.addField("Content", message, false)
+                embed.addField("Author", mention, true)
+                embed.addField("Channel", "TBI", true)
+                embed.setFooter("$pin $pinCount pushpins", null)
+                image?.url?.let { embed.setImage(it) }
+            }
         }.block()
     }
 
