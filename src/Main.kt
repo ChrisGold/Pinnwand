@@ -1,4 +1,3 @@
-import discord4j.core.DiscordClientBuilder
 import discord4j.core.`object`.reaction.ReactionEmoji
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
@@ -7,38 +6,38 @@ import java.io.File
 import java.util.*
 
 fun main(args: Array<String>) {
+    //Read config and build Discord Client
     val configFile = File((args.getOrNull(0) ?: "pinbot.config.yaml"))
-    val (token, pinboards) = Config.read(configFile)
-    val client = DiscordClientBuilder(token).build()
+    val (client, pinboards) = Config.read(configFile)
 
-    client.guilds.subscribe {
-        val name = it.name
-        val id = it.id
-        it.channels.subscribe {
-            val channelName = it.name
-            val channelId = it.id
-            println("Guild $name ($id): Channel $channelName ($channelId)")
-        }
-    }
-
+    //Listen to pin events
     client.eventDispatcher.on(ReactionAddEvent::class.java).filter {
         isPinEmoji(it.emoji)
     }.subscribe {
-        it.guildId.k?.let { guildId -> pinboards[guildId]?.let { pinboard -> pinboard(client, it) } }
+        it.guildId.k?.let { guildId -> pinboards[guildId]?.let { pinboard -> pinboard(it) } }
     }
 
+    //Listen to unpin events
     client.eventDispatcher.on(ReactionRemoveEvent::class.java).filter {
         isPinEmoji(it.emoji)
     }.subscribe {
-        it.guildId.k?.let { guildId -> pinboards[guildId]?.let { pinboard -> pinboard(client, it) } }
+        it.guildId.k?.let { guildId -> pinboards[guildId]?.let { pinboard -> pinboard(it) } }
     }
+
+    //Login
     client.login().block()
 }
 
+/**
+ * A ReactionEmoji is a pin emoji if and only if it is the Unicode "📌"
+ */
 fun isPinEmoji(emoji: ReactionEmoji): Boolean {
     return emoji.asUnicodeEmoji().let { it.isPresent && it.get().raw == pin }
 }
 
+/**
+ * Helper method for transforming Java optionals into Kotlin nullables
+ */
 val <T> Optional<T>.k get() = if (this.isPresent) this.get() else null
 
 const val pin = "\uD83D\uDCCC"

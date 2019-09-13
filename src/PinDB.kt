@@ -10,22 +10,25 @@ import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.sql.Connection
 
+/**
+ * A singleton managing access to the database
+ */
 object PinDB {
-    val db = Database.connect("jdbc:sqlite:pins.db", "org.sqlite.JDBC")
+    //Init the database with the JDBC driver for SQLite
+    private val db = Database.connect("jdbc:sqlite:pins.db", "org.sqlite.JDBC")
+
     init {
+        //SQLite doesn't support all transaction modes
         TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_SERIALIZABLE
         transaction(db) {
+            //Ensure that all tables are present
             SchemaUtils.createMissingTablesAndColumns(PinboardPosts)
         }
     }
 
-    fun hasBeenPinned(pinnedPost: Snowflake): Boolean {
-        val id = pinnedPost.asLong()
-        return !PinboardPost.find {
-            PinboardPosts.pinnedPost eq id
-        }.empty()
-    }
-
+    /**
+     * Record a new pinned post
+     */
     fun recordPinning(pinboardPostId: Snowflake, author: Snowflake, pinnedPost: Snowflake, pinCount: Int) =
         transaction(db) {
             PinboardPost.new {
@@ -36,12 +39,18 @@ object PinDB {
             }
         }
 
+    /**
+     * Remove a pinboard post
+     */
     fun removePinning(pinboardPostId: Snowflake) = transaction(db) {
         PinboardPosts.deleteWhere {
             PinboardPosts.id eq pinboardPostId.asLong()
         }
     }
 
+    /**
+     * Update the pin count on a pinboard post
+     */
     fun updatePinCount(pinnedPost: Snowflake, pinCount: Int) = transaction(db) {
         PinboardPost.find {
             PinboardPosts.pinnedPost eq pinnedPost.asLong()
@@ -50,6 +59,9 @@ object PinDB {
         }
     }
 
+    /**
+     * Find a specific post on the pinboard
+     */
     fun findPinboardPost(pinnedPost: Snowflake): Snowflake? = transaction(db) {
         PinboardPost.find {
             PinboardPosts.pinnedPost eq pinnedPost.asLong()
