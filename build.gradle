@@ -34,6 +34,15 @@ sourceSets {
     test.resources.srcDirs = []
 }
 
+jar {
+    manifest {
+        attributes "Main-Class": "MainKt"
+    }
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
 compileKotlin {
     kotlinOptions.jvmTarget = "1.8"
 }
