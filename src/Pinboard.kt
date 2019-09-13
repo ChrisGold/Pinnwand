@@ -73,11 +73,11 @@ class Pinboard(val guild: String, val guildId: Snowflake, val pinboardChannelId:
         """.trimIndent()
         originalMessage.edit {
             it.setContent(pinMessage)
-        }
+        }.block()
     }
 
     fun deletePinPost(client: DiscordClient, pinboardPost: Snowflake) {
-        client.getMessageById(pinboardChannelId, pinboardPost).block().delete()
+        client.getMessageById(pinboardChannelId, pinboardPost).block().delete().block()
     }
 }
 
