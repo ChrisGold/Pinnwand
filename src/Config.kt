@@ -21,7 +21,7 @@ data class Config(val client: DiscordClient, val pinboards: Map<Snowflake, Pinbo
                 val guild = it.guild
                 val guildId = Snowflake.of(it.guildId)
                 val pinboardChannelId = Snowflake.of(it.pinboardChannel)
-                guildId to Pinboard(client, guild, guildId, pinboardChannelId)
+                guildId to Pinboard(client, guild, guildId, pinboardChannelId, it.threshold)
             }.toMap()
             return Config(client, pinboards)
         }
@@ -30,4 +30,9 @@ data class Config(val client: DiscordClient, val pinboards: Map<Snowflake, Pinbo
 
 data class YAMLConfig(var token: String = "", var guilds: List<YAMLPinboard> = emptyList())
 
-data class YAMLPinboard(var guild: String = "", var guildId: Long = 0, var pinboardChannel: Long = 0)
+data class YAMLPinboard(
+    var guild: String = "",
+    var guildId: Long = 0,
+    var pinboardChannel: Long = 0,
+    var threshold: Int = 5
+)
