@@ -24,6 +24,7 @@ class Pinboard(
             val authorId = author?.id
             val content = message.content.k
             val image = message.embeds.getOrNull(0)?.image?.k
+            val channelId = message.channelId
             //Should the post be pinned at all?
             if (pinReaction != null && authorId != null && pinReaction.count >= pinThreshold) {
                 //Has the post been pinned before?
@@ -32,7 +33,7 @@ class Pinboard(
                     null -> {
                         //Post hasn't been pinned yet
                         println("Pinning $message")
-                        val pinboardPost = createPinPost(client, content, authorId, pinReaction.count, image)
+                        val pinboardPost = createPinPost(client, content, channelId, authorId, pinReaction.count, image)
                         PinDB.recordPinning(pinboardPost, authorId, messageId, pinReaction.count)
                     }
                     else -> {
@@ -41,6 +42,7 @@ class Pinboard(
                             client,
                             pinboardPost,
                             content,
+                            channelId,
                             authorId,
                             pinReaction.count,
                             image
@@ -59,6 +61,7 @@ class Pinboard(
             val pinReaction = message.reactions.firstOrNull { isPinEmoji(it.emoji) }
             val content = message.content.k
             val pinboardPost = PinDB.findPinboardPost(message.id)
+            val channelId = message.channelId
             val author = message.author.k
             val image = message.embeds.getOrNull(0)?.image?.k
             if (pinReaction == null || pinReaction.count < pinThreshold) {
@@ -68,7 +71,7 @@ class Pinboard(
                     deletePinPost(client, pinboardPost)
                 }
             } else if (pinboardPost != null && pinReaction.count >= pinThreshold) {
-                updatePinPost(client, pinboardPost, content, author?.id, pinReaction.count, image)
+                updatePinPost(client, pinboardPost, content, channelId, author?.id, pinReaction.count, image)
                 PinDB.updatePinCount(pinboardPost, pinReaction.count)
             }
         }
@@ -84,18 +87,20 @@ class Pinboard(
     fun createPinPost(
         client: DiscordClient,
         message: String?,
+        channel: Snowflake?,
         author: Snowflake?,
         pinCount: Int?,
         image: Embed.Image?
     ): Snowflake {
-        val channel = client.getChannelById(pinboardChannelId).block() as MessageChannel
+        val pinboardChannel = client.getChannelById(pinboardChannelId).block() as MessageChannel
+        val channel = "<#${channel?.asString()}>"
         val mention = "<@!${author?.asString()}>"
-        val message = channel.createMessage {
-            it.setContent("Users liked a message by $mention so much they pinned it!")
+        val message = pinboardChannel.createMessage {
+            it.setContent("A post from $mention was pinned.")
             it.setEmbed { embed ->
                 embed.addField("Content", message, false)
                 embed.addField("Author", mention, true)
-                embed.addField("Channel", "TBI", true)
+                embed.addField("Channel", channel, true)
                 embed.setFooter("$pin $pinCount pushpins", null)
                 image?.url?.let { embed.setImage(it) }
             }
@@ -108,18 +113,20 @@ class Pinboard(
         client: DiscordClient,
         pinboardPost: Snowflake,
         message: String?,
+        channel: Snowflake?,
         author: Snowflake?,
         pinCount: Int?,
         image: Embed.Image?
     ) {
         val originalMessage = client.getMessageById(pinboardChannelId, pinboardPost).block()
         val mention = "<@!${author?.asString()}>"
+        val channel = "<#${channel?.asString()}>"
         originalMessage.edit {
-            it.setContent("Users liked a message by $mention so much they pinned it!")
+            it.setContent("A post from $mention was pinned.")
             it.setEmbed { embed ->
                 embed.addField("Content", message, false)
                 embed.addField("Author", mention, true)
-                embed.addField("Channel", "TBI", true)
+                embed.addField("Channel", channel, true)
                 embed.setFooter("$pin $pinCount pushpins", null)
                 image?.url?.let { embed.setImage(it) }
             }
