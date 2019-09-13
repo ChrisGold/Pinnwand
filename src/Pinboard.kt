@@ -29,7 +29,7 @@ class Pinboard(
                     }
                     else -> {
                         //Post has been pinned already
-
+                        update(pinPostData, pinboardPost)
                     }
                 }
             }
