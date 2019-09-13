@@ -1,5 +1,6 @@
 import discord4j.core.DiscordClient
 import discord4j.core.`object`.Embed
+import discord4j.core.`object`.entity.Message
 import discord4j.core.`object`.entity.MessageChannel
 import discord4j.core.`object`.util.Snowflake
 import discord4j.core.event.domain.message.MessageDeleteEvent
@@ -18,38 +19,17 @@ class Pinboard(
      */
     operator fun invoke(reactionAddEvent: ReactionAddEvent) =
         reactionAddEvent.message.subscribe { message ->
-            val pinReaction = message.reactions.firstOrNull { isPinEmoji(it.emoji) }
-            val messageId = message.id
-            val author = message.author.k
-            val authorId = author?.id
-            val content = message.content.k
-            val image = message.embeds.getOrNull(0)?.image?.k
-            val channelId = message.channelId
-            //Should the post be pinned at all?
-            if (pinReaction != null && authorId != null && pinReaction.count >= pinThreshold) {
+            PinPostData.from(message)?.let { pinPostData ->
                 //Has the post been pinned before?
-                val pinboardPost = PinDB.findPinboardPost(message.id)
+                val pinboardPost = PinDB.findPinboardPost(pinPostData.messageId)
                 when (pinboardPost) {
                     null -> {
                         //Post hasn't been pinned yet
-                        println("Pinning $message")
-                        val pinboardPost =
-                            createPinPost(client, content, messageId, channelId, authorId, pinReaction.count, image)
-                        PinDB.recordPinning(pinboardPost, authorId, messageId, pinReaction.count)
+                        pin(pinPostData)
                     }
                     else -> {
                         //Post has been pinned already
-                        updatePinPost(
-                            client,
-                            pinboardPost,
-                            content,
-                            messageId,
-                            channelId,
-                            authorId,
-                            pinReaction.count,
-                            image
-                        )
-                        PinDB.updatePinCount(pinboardPost, pinReaction.count)
+
                     }
                 }
             }
@@ -60,32 +40,42 @@ class Pinboard(
      */
     operator fun invoke(reactionRemoveEvent: ReactionRemoveEvent) =
         reactionRemoveEvent.message.subscribe { message ->
-            val pinReaction = message.reactions.firstOrNull { isPinEmoji(it.emoji) }
-            val content = message.content.k
-            val pinboardPost = PinDB.findPinboardPost(message.id)
-            val channelId = message.channelId
-            val author = message.author.k
-            val image = message.embeds.getOrNull(0)?.image?.k
-            if (pinReaction == null || pinReaction.count < pinThreshold) {
-                if (pinboardPost != null) {
-                    println("Unpinning $message")
-                    PinDB.removePinning(pinboardPost)
-                    deletePinPost(client, pinboardPost)
-                }
-            } else if (pinboardPost != null && pinReaction.count >= pinThreshold) {
-                updatePinPost(
-                    client,
-                    pinboardPost,
-                    content,
-                    message.id,
-                    channelId,
-                    author?.id,
-                    pinReaction.count,
-                    image
-                )
-                PinDB.updatePinCount(pinboardPost, pinReaction.count)
+            PinDB.findPinboardPost(message.id)?.let { pinboardPost ->
+                PinPostData.from(message)?.let { pinPostData ->
+                    if (pinPostData.pinCount < pinThreshold) {
+                        unpin(pinPostData, pinboardPost)
+                    } else if (pinPostData.pinCount >= pinThreshold) {
+                        update(pinPostData, pinboardPost)
+                    }
+                } ?: unpin(null, pinboardPost)
             }
         }
+
+    fun unpin(pinPostData: PinPostData?, pinboardPost: Snowflake) {
+        logger.info("Unpinning $pinPostData")
+        PinDB.removePinning(pinboardPost)
+        deletePinPost(client, pinboardPost)
+    }
+
+    fun pin(pinPostData: PinPostData) {
+        logger.info("Pinning $pinPostData")
+        val newPinboardPost =
+            createPinPost(pinPostData)
+        PinDB.recordPinning(
+            newPinboardPost,
+            pinPostData.author ?: Snowflake.of(0),
+            pinPostData.messageId,
+            pinPostData.pinCount
+        )
+    }
+
+    fun update(pinPostData: PinPostData, pinboardPost: Snowflake) {
+        updatePinPost(
+            pinboardPost,
+            pinPostData
+        )
+        PinDB.updatePinCount(pinboardPost, pinPostData.pinCount)
+    }
 
     operator fun invoke(messageDeleteEvent: MessageDeleteEvent) {
         val messageId = messageDeleteEvent.messageId
@@ -96,14 +86,8 @@ class Pinboard(
     }
 
     fun createPinPost(
-        client: DiscordClient,
-        message: String?,
-        messageId: Snowflake,
-        channel: Snowflake?,
-        author: Snowflake?,
-        pinCount: Int?,
-        image: Embed.Image?
-    ): Snowflake {
+        pinPostData: PinPostData
+    ): Snowflake = pinPostData.run {
         val pinboardChannel = client.getChannelById(pinboardChannelId).block() as MessageChannel
         val link = channel?.let {
             "https://discordapp.com/channels/${guildId.asString()}/${channel.asString()}/${messageId.asString()}"
@@ -126,15 +110,9 @@ class Pinboard(
     }
 
     fun updatePinPost(
-        client: DiscordClient,
         pinboardPost: Snowflake,
-        message: String?,
-        messageId: Snowflake,
-        channel: Snowflake?,
-        author: Snowflake?,
-        pinCount: Int?,
-        image: Embed.Image?
-    ) {
+        pinPostData: PinPostData
+    ) = pinPostData.run {
         val link = channel?.let {
             "https://discordapp.com/channels/${guildId.asString()}/${channel.asString()}/${messageId.asString()}"
         }
@@ -156,5 +134,32 @@ class Pinboard(
 
     fun deletePinPost(client: DiscordClient, pinboardPost: Snowflake) {
         client.getMessageById(pinboardChannelId, pinboardPost).block().delete().block()
+    }
+}
+
+
+data class PinPostData(
+    val messageId: Snowflake,
+    val message: String?,
+    val channel: Snowflake?,
+    val author: Snowflake?,
+    val pinCount: Int,
+    val image: Embed.Image?
+) {
+    companion object {
+        fun from(message: Message): PinPostData? {
+            val pinReaction = message.reactions.firstOrNull { isPinEmoji(it.emoji) }
+            return if (pinReaction != null) {
+                val image = message.embeds.getOrNull(0)?.image?.k
+                PinPostData(
+                    message.id,
+                    message.content.k,
+                    message.channelId,
+                    message.author.k?.id,
+                    pinReaction.count,
+                    image
+                )
+            } else null
+        }
     }
 }
