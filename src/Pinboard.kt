@@ -150,17 +150,19 @@ class Pinboard(
                     embed.setFooter("$pin $pinCount pushpins", null)
                     image?.url?.let { embed.setImage(it) }
                 }
-            }.block()
+            }.subscribe()
         }
     }
 
     fun deletePinPost(pinboardPost: Snowflake) {
-        client.getMessageById(pinboardChannelId, pinboardPost).block().delete().doOnError {
+        client.getMessageById(pinboardChannelId, pinboardPost).flatMap {
+            it.delete()
+        }.doOnError {
             if (it is ClientException && it.status.code() == 404) {
                 //The post has been deleted
                 PinDB.removePinning(pinboardPost)
             } else throw  it
-        }.block()
+        }.subscribe()
     }
 
     fun displayLeaderboard(channel: MessageChannel) {
@@ -173,7 +175,7 @@ class Pinboard(
                 it.addField("User", users, true)
                 it.addField("Pins", pins, true)
             }
-        }.block()
+        }.subscribe()
     }
 }
 
