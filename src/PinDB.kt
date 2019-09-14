@@ -3,9 +3,7 @@ import org.jetbrains.exposed.dao.Entity
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.EntityID
 import org.jetbrains.exposed.dao.LongIdTable
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.sql.Connection
@@ -52,10 +50,8 @@ object PinDB {
      * Update the pin count on a pinboard post
      */
     fun updatePinCount(pinnedPost: Snowflake, pinCount: Int) = transaction(db) {
-        PinboardPost.find {
-            PinboardPosts.pinnedPost eq pinnedPost.asLong()
-        }.firstOrNull()?.let {
-            it.pinCount = pinCount
+        PinboardPosts.update({ PinboardPosts.pinnedPost eq pinnedPost.asLong() }) {
+            it[PinboardPosts.pinCount] = pinCount
         }
     }
 
@@ -68,6 +64,26 @@ object PinDB {
         }.firstOrNull()?.pinboardPost?.let {
             Snowflake.of(it.value)
         }
+    }
+
+    fun tallyLeaderboard() = transaction {
+        //TODO: Make this respect different guilds
+        val results = PinboardPosts.slice(PinboardPosts.author, PinboardPosts.pinCount.sum())
+            .selectAll()
+            .groupBy(PinboardPosts.author)
+            .execute(this)
+        val list = ArrayList<LeaderboardEntry>()
+        results?.let {
+            while (it.next()) {
+                //Remember: cursor fields are 1-indexed
+                val author = it.getLong(1)
+                val tally = it.getInt(2)
+                list.add(LeaderboardEntry(Snowflake.of(author), tally))
+            }
+        }
+        //Maybe do this as an SQL order-by
+        list.sortByDescending { it.pinTotal }
+        list
     }
 }
 
@@ -85,3 +101,5 @@ class PinboardPost(pinboardPost: EntityID<Long>) : Entity<Long>(pinboardPost) {
     var pinnedPost by PinboardPosts.pinnedPost
     var pinCount by PinboardPosts.pinCount
 }
+
+data class LeaderboardEntry(val author: Snowflake, val pinTotal: Int)
