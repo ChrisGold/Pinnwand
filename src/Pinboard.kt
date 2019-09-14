@@ -3,9 +3,11 @@ import discord4j.core.`object`.Embed
 import discord4j.core.`object`.entity.Message
 import discord4j.core.`object`.entity.MessageChannel
 import discord4j.core.`object`.util.Snowflake
+import discord4j.core.event.domain.message.MessageCreateEvent
 import discord4j.core.event.domain.message.MessageDeleteEvent
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
+import java.util.*
 
 class Pinboard(
     val client: DiscordClient,
@@ -58,7 +60,7 @@ class Pinboard(
     fun unpin(pinPostData: PinPostData?, pinboardPost: Snowflake) {
         logger.info("Unpinning $pinPostData")
         PinDB.removePinning(pinboardPost)
-        deletePinPost(client, pinboardPost)
+        deletePinPost(pinboardPost)
     }
 
     fun pin(pinPostData: PinPostData) {
@@ -85,7 +87,16 @@ class Pinboard(
         val messageId = messageDeleteEvent.messageId
         PinDB.findPinboardPost(messageId)?.let {
             PinDB.removePinning(it)
-            deletePinPost(client, it)
+            deletePinPost(it)
+        }
+    }
+
+    operator fun invoke(messageCreateEvent: MessageCreateEvent) {
+        val message = messageCreateEvent.message
+        if (message.content.k?.startsWith("*leaderboard") ?: false) {
+            message.channel.subscribe {
+                displayLeaderboard(it)
+            }
         }
     }
 
@@ -97,7 +108,7 @@ class Pinboard(
             "https://discordapp.com/channels/${guildId.asString()}/${channel.asString()}/${messageId.asString()}"
         }
         val channel = "<#${channel?.asString()}>"
-        val mention = "<@!${author?.asString()}>"
+        val mention = mentionUser(author)
         val message = pinboardChannel.createMessage {
             it.setContent("A post from $mention was pinned.")
             it.setEmbed { embed ->
@@ -121,7 +132,7 @@ class Pinboard(
             "https://discordapp.com/channels/${guildId.asString()}/${channel.asString()}/${messageId.asString()}"
         }
         val originalMessage = client.getMessageById(pinboardChannelId, pinboardPost).block()
-        val mention = "<@!${author?.asString()}>"
+        val mention = mentionUser(author)
         val channel = "<#${channel?.asString()}>"
         originalMessage.edit {
             it.setContent("A post from $mention was pinned.")
@@ -136,11 +147,23 @@ class Pinboard(
         }.block()
     }
 
-    fun deletePinPost(client: DiscordClient, pinboardPost: Snowflake) {
+    fun deletePinPost(pinboardPost: Snowflake) {
         client.getMessageById(pinboardChannelId, pinboardPost).block().delete().block()
     }
-}
 
+    fun displayLeaderboard(channel: MessageChannel) {
+        val leaderboard = PinDB.tallyLeaderboard()
+        val (positions, users, pins) = display(leaderboard)
+        channel.createMessage {
+            it.setEmbed {
+                it.setDescription("Pinnwand Leaderboard")
+                it.addField("Rank", positions, true)
+                it.addField("User", users, true)
+                it.addField("Pins", pins, true)
+            }
+        }.block()
+    }
+}
 
 data class PinPostData(
     val messageId: Snowflake,
@@ -167,3 +190,20 @@ data class PinPostData(
         }
     }
 }
+
+private fun display(list: List<LeaderboardEntry>): Triple<String, String, String> {
+    val position = StringJoiner("\n")
+    val user = StringJoiner("\n")
+    val pins = StringJoiner("\n")
+
+    list.forEachIndexed { i, (author, pinCount) ->
+        val pos = (i + 1).toString()
+        position.add(pos)
+        user.add(mentionUser(author))
+        pins.add(pinCount.toString())
+    }
+
+    return Triple(position.toString(), user.toString(), pins.toString())
+}
+
+private fun mentionUser(user: Snowflake?): String = "<@!${user?.asString()}>"
