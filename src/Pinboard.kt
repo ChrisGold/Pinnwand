@@ -7,6 +7,7 @@ import discord4j.core.event.domain.message.MessageCreateEvent
 import discord4j.core.event.domain.message.MessageDeleteEvent
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
+import discord4j.rest.http.client.ClientException
 import java.util.*
 
 class Pinboard(
@@ -131,24 +132,35 @@ class Pinboard(
         val link = channel?.let {
             "https://discordapp.com/channels/${guildId.asString()}/${channel.asString()}/${messageId.asString()}"
         }
-        val originalMessage = client.getMessageById(pinboardChannelId, pinboardPost).block()
-        val mention = mentionUser(author)
-        val channel = "<#${channel?.asString()}>"
-        originalMessage.edit {
-            it.setContent("A post from $mention was pinned.")
-            it.setEmbed { embed ->
-                embed.setDescription("[Link to Post]($link)")
-                embed.addField("Content", message, false)
-                embed.addField("Author", mention, true)
-                embed.addField("Channel", channel, true)
-                embed.setFooter("$pin $pinCount pushpins", null)
-                image?.url?.let { embed.setImage(it) }
-            }
-        }.block()
+        val originalMessage = client.getMessageById(pinboardChannelId, pinboardPost).doOnError {
+            if (it is ClientException && it.status.code() == 404) {
+                //The post has been deleted
+                createPinPost(pinPostData)
+            } else throw  it
+        }.subscribe {
+            val mention = mentionUser(author)
+            val channel = "<#${channel?.asString()}>"
+            it.edit {
+                it.setContent("A post from $mention was pinned.")
+                it.setEmbed { embed ->
+                    embed.setDescription("[Link to Post]($link)")
+                    embed.addField("Content", message, false)
+                    embed.addField("Author", mention, true)
+                    embed.addField("Channel", channel, true)
+                    embed.setFooter("$pin $pinCount pushpins", null)
+                    image?.url?.let { embed.setImage(it) }
+                }
+            }.block()
+        }
     }
 
     fun deletePinPost(pinboardPost: Snowflake) {
-        client.getMessageById(pinboardChannelId, pinboardPost).block().delete().block()
+        client.getMessageById(pinboardChannelId, pinboardPost).block().delete().doOnError {
+            if (it is ClientException && it.status.code() == 404) {
+                //The post has been deleted
+                PinDB.removePinning(pinboardPost)
+            } else throw  it
+        }.block()
     }
 
     fun displayLeaderboard(channel: MessageChannel) {
