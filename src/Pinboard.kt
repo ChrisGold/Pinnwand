@@ -196,6 +196,10 @@ private fun display(list: List<LeaderboardEntry>): Triple<String, String, String
     val user = StringJoiner("\n")
     val pins = StringJoiner("\n")
 
+    if (list.isEmpty()) {
+        return Triple("<empty>", "<empty>", "<empty>")
+    }
+
     list.forEachIndexed { i, (author, pinCount) ->
         val pos = (i + 1).toString()
         position.add(pos)
