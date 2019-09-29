@@ -8,6 +8,7 @@ import discord4j.core.event.domain.message.MessageDeleteEvent
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
 import discord4j.rest.http.client.ClientException
+import reactor.core.publisher.Mono
 import java.util.*
 
 class Pinboard(
@@ -58,30 +59,32 @@ class Pinboard(
             }
         }
 
-    fun unpin(pinPostData: PinPostData?, pinboardPost: Snowflake) {
+    private fun unpin(pinPostData: PinPostData?, pinboardPost: Snowflake) {
         logger.info("Unpinning $pinPostData")
         PinDB.removePinning(pinboardPost)
         deletePinPost(pinboardPost)
     }
 
-    fun pin(pinPostData: PinPostData) {
+    private fun pin(pinPostData: PinPostData) {
         logger.info("Pinning $pinPostData")
-        val newPinboardPost =
-            createPinPost(pinPostData)
-        PinDB.recordPinning(
-            newPinboardPost,
-            pinPostData.author ?: Snowflake.of(0),
-            pinPostData.messageId,
-            pinPostData.pinCount
-        )
+        createPinPost(pinPostData).subscribe {
+            PinDB.recordPinning(
+                it.id,
+                pinPostData.author ?: Snowflake.of(0),
+                pinPostData.messageId,
+                pinPostData.pinCount
+            )
+        }
+
     }
 
-    fun update(pinPostData: PinPostData, pinboardPost: Snowflake) {
+    private fun update(pinPostData: PinPostData, pinboardPost: Snowflake) {
         updatePinPost(
             pinboardPost,
             pinPostData
-        )
-        PinDB.updatePinCount(pinboardPost, pinPostData.pinCount)
+        ).subscribe {
+            PinDB.updatePinCount(pinboardPost, pinPostData.pinCount)
+        }
     }
 
     operator fun invoke(messageDeleteEvent: MessageDeleteEvent) {
@@ -94,53 +97,23 @@ class Pinboard(
 
     operator fun invoke(messageCreateEvent: MessageCreateEvent) {
         val message = messageCreateEvent.message
-        if (message.content.k?.startsWith("*leaderboard") ?: false) {
+        if (message.content.k?.startsWith("*leaderboard") == true) {
             message.channel.subscribe {
                 displayLeaderboard(it)
             }
         }
     }
 
-    fun createPinPost(
+    private fun createPinPost(
         pinPostData: PinPostData
-    ): Snowflake = pinPostData.run {
-        val pinboardChannel = client.getChannelById(pinboardChannelId).block() as MessageChannel
-        val link = channel?.let {
-            "https://discordapp.com/channels/${guildId.asString()}/${channel.asString()}/${messageId.asString()}"
-        }
-        val channel = "<#${channel?.asString()}>"
-        val mention = mentionUser(author)
-        val message = pinboardChannel.createMessage {
-            it.setContent("A post from $mention was pinned.")
-            it.setEmbed { embed ->
-                embed.setDescription("[Link to Post]($link)")
-                embed.addField("Content", message, false)
-                embed.addField("Author", mention, true)
-                embed.addField("Channel", channel, true)
-                embed.setFooter("$pin $pinCount pushpins", null)
-                image?.url?.let { embed.setImage(it) }
+    ): Mono<Message> = pinPostData.run {
+        client.getChannelById(pinboardChannelId).map { it as MessageChannel }.flatMap { pinboardChannel ->
+            val link = channel?.let {
+                "https://discordapp.com/channels/${guildId.asString()}/${channel.asString()}/${messageId.asString()}"
             }
-        }.block()
-
-        return message.id
-    }
-
-    fun updatePinPost(
-        pinboardPost: Snowflake,
-        pinPostData: PinPostData
-    ) = pinPostData.run {
-        val link = channel?.let {
-            "https://discordapp.com/channels/${guildId.asString()}/${channel.asString()}/${messageId.asString()}"
-        }
-        val originalMessage = client.getMessageById(pinboardChannelId, pinboardPost).doOnError {
-            if (it is ClientException && it.status.code() == 404) {
-                //The post has been deleted
-                createPinPost(pinPostData)
-            } else throw  it
-        }.subscribe {
-            val mention = mentionUser(author)
             val channel = "<#${channel?.asString()}>"
-            it.edit {
+            val mention = mentionUser(author)
+            pinboardChannel.createMessage {
                 it.setContent("A post from $mention was pinned.")
                 it.setEmbed { embed ->
                     embed.setDescription("[Link to Post]($link)")
@@ -150,11 +123,40 @@ class Pinboard(
                     embed.setFooter("$pin $pinCount pushpins", null)
                     image?.url?.let { embed.setImage(it) }
                 }
-            }.subscribe()
+            }
         }
     }
 
-    fun deletePinPost(pinboardPost: Snowflake) {
+    private fun updatePinPost(
+        pinboardPost: Snowflake,
+        pinPostData: PinPostData
+    ): Mono<Message> = pinPostData.run {
+        val link = channel?.let {
+            "https://discordapp.com/channels/${guildId.asString()}/${channel.asString()}/${messageId.asString()}"
+        }
+        client.getMessageById(pinboardChannelId, pinboardPost).doOnError {
+            if (it is ClientException && it.status.code() == 404) {
+                //The post has been deleted
+                createPinPost(pinPostData).subscribe()
+            } else throw  it
+        }.flatMap { msg ->
+            val mention = mentionUser(author)
+            val channel = "<#${channel?.asString()}>"
+            msg.edit { edit ->
+                edit.setContent("A post from $mention was pinned.")
+                edit.setEmbed { embed ->
+                    embed.setDescription("[Link to Post]($link)")
+                    embed.addField("Content", message ?: "null", false)
+                    embed.addField("Author", mention, true)
+                    embed.addField("Channel", channel, true)
+                    embed.setFooter("$pin $pinCount pushpins", null)
+                    image?.url?.let { embed.setImage(it) }
+                }
+            }
+        }
+    }
+
+    private fun deletePinPost(pinboardPost: Snowflake) {
         client.getMessageById(pinboardChannelId, pinboardPost).flatMap {
             it.delete()
         }.doOnError {
@@ -165,7 +167,7 @@ class Pinboard(
         }.subscribe()
     }
 
-    fun displayLeaderboard(channel: MessageChannel) {
+    private fun displayLeaderboard(channel: MessageChannel) {
         val leaderboard = PinDB.tallyLeaderboard()
         val (positions, users, pins) = display(leaderboard)
         channel.createMessage {
