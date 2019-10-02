@@ -46,6 +46,12 @@ object PinDB {
         }
     }
 
+    fun unregisterPinnedPost(pinnedPost: Snowflake) = transaction(db) {
+        PinboardPosts.deleteWhere {
+            PinboardPosts.pinnedPost eq pinnedPost.asLong()
+        }
+    }
+
     /**
      * Update the pin count on a pinboard post
      */
@@ -84,6 +90,10 @@ object PinDB {
         //Maybe do this as an SQL order-by
         list.sortByDescending { it.pinTotal }
         list
+    }
+
+    fun allPinnedPosts() = transaction {
+        PinboardPosts.slice(PinboardPosts.pinnedPost).selectAll().map { Snowflake.of(it[PinboardPosts.pinnedPost]) }
     }
 }
 

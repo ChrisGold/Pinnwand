@@ -8,8 +8,11 @@ import discord4j.core.event.domain.message.MessageDeleteEvent
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
 import discord4j.rest.http.client.ClientException
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import java.time.Instant
 import java.util.*
+import java.util.stream.Collectors
 
 class Pinboard(
     val client: DiscordClient,
@@ -59,6 +62,29 @@ class Pinboard(
             }
         }
 
+    operator fun invoke(messageDeleteEvent: MessageDeleteEvent) {
+        val messageId = messageDeleteEvent.messageId
+        PinDB.findPinboardPost(messageId)?.let {
+            PinDB.removePinning(it)
+            deletePinPost(it)
+        }
+    }
+
+    operator fun invoke(messageCreateEvent: MessageCreateEvent) {
+        val message = messageCreateEvent.message
+        val content = message.content.k ?: return
+        if (content.startsWith("*leaderboard")) {
+            message.channel.subscribe {
+                displayLeaderboard(it)
+            }
+        } else if (content.startsWith("*rescan")) {
+            val messagesBack = content.split(" ")[1].toInt()
+            require(messagesBack > 0) { "Number of messages to go back must be positive! messagesBack = $messagesBack" }
+            syncDB()
+            rescan(messagesBack)
+        }
+    }
+
     private fun unpin(pinPostData: PinPostData?, pinboardPost: Snowflake) {
         logger.info("Unpinning $pinPostData")
         PinDB.removePinning(pinboardPost)
@@ -84,23 +110,6 @@ class Pinboard(
             pinPostData
         ).subscribe {
             PinDB.updatePinCount(pinboardPost, pinPostData.pinCount)
-        }
-    }
-
-    operator fun invoke(messageDeleteEvent: MessageDeleteEvent) {
-        val messageId = messageDeleteEvent.messageId
-        PinDB.findPinboardPost(messageId)?.let {
-            PinDB.removePinning(it)
-            deletePinPost(it)
-        }
-    }
-
-    operator fun invoke(messageCreateEvent: MessageCreateEvent) {
-        val message = messageCreateEvent.message
-        if (message.content.k?.startsWith("*leaderboard") == true) {
-            message.channel.subscribe {
-                displayLeaderboard(it)
-            }
         }
     }
 
@@ -179,6 +188,61 @@ class Pinboard(
             }
         }.subscribe()
     }
+
+    private fun syncDB() {
+        /*
+        There can be two type of inconsistencies between the pinboard channel and the DB
+        I.  A post exists in the channel but not in the DB
+            Resolution: Put post in DB
+        II. A post exists in the DB but not in the channel
+            Resolution: Delete post from DB
+        */
+        client.getChannelById(pinboardChannelId).flatMapMany { channel ->
+            channel as MessageChannel    //Precondition
+            channel.getMessagesBefore(Snowflake.of(Instant.now())).filter {
+                it.author.k?.id == client.selfId.k
+            }.take(2000)
+        }.map { message ->
+            val pinboardPostId = message.id
+            val embed = message.embeds.firstOrNull()
+            embed?.let { embed ->
+                extractInfo(embed)?.let { (pinnedPostId, pinCount) ->
+                    val entry = PinDB.findPinboardPost(pinnedPostId)
+                    val author = message.author.k?.id ?: Snowflake.of(0L)
+                    if (entry != pinboardPostId) {
+                        if (entry != null) {
+                            PinDB.unregisterPinnedPost(entry)
+                        }
+                        PinDB.recordPinning(pinboardPostId, author, pinnedPostId, pinCount)
+                    }
+                    pinnedPostId
+                }
+            }
+        }.filter(Objects::nonNull).map { it!! }.collect(Collectors.toSet()).subscribe { pinnedPosts ->
+            val pinnedPostsInDB = PinDB.allPinnedPosts()
+            for (pinnedPostInDB in pinnedPostsInDB) {
+                if (!pinnedPosts.contains(pinnedPostInDB)) {
+                    PinDB.removePinning(pinnedPostInDB)
+                }
+            }
+        }
+    }
+
+    private fun rescan(messagesBack: Int) =
+        client.getGuildById(guildId).flatMapMany {
+            it.channels.flatMap { channel ->
+                if (channel is MessageChannel) {
+                    channel.getMessagesBefore(Snowflake.of(Instant.now()))
+                        .take(messagesBack.toLong())
+                        .map(PinPostData.Companion::from)
+                        .filter(Objects::nonNull)
+                        .map { it!! }
+                } else Flux.empty<PinPostData>()
+            }
+        }.subscribe {
+            TODO()
+        }
+
 }
 
 data class PinPostData(
@@ -227,3 +291,19 @@ private fun display(list: List<LeaderboardEntry>): Triple<String, String, String
 }
 
 private fun mentionUser(user: Snowflake?): String = "<@!${user?.asString()}>"
+
+private fun extractLink(embedDescription: String): String? {
+    val start = embedDescription.indexOf('(')
+    val end = embedDescription.indexOf(')', start)
+    if (start < 0 || end < 0) return null
+    return embedDescription.substring(start + 1, end)
+}
+
+private fun extractMessage(link: String): Snowflake = Snowflake.of(link.substringAfterLast('/'))
+
+private fun extractInfo(embed: Embed): Pair<Snowflake, Int>? {
+    val pinnedPostId = embed.description.k?.let { extractLink(it) }?.let { extractMessage(it) }
+    val pinCount = embed.footer.k?.text?.split(' ')?.getOrNull(1)?.toInt()
+    return if (pinnedPostId == null || pinCount == null) null
+    else pinnedPostId to pinCount
+}
