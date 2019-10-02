@@ -4,14 +4,19 @@ import discord4j.core.event.domain.message.MessageCreateEvent
 import discord4j.core.event.domain.message.MessageDeleteEvent
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
+import discord4j.gateway.retry.RetryOptions
 import org.apache.logging.log4j.LogManager
+import reactor.core.scheduler.Schedulers
 import java.io.File
+import java.time.Duration
 import java.util.*
 
 fun main(args: Array<String>) {
     //Read config and build Discord Client
     val configFile = File((args.getOrNull(0) ?: "pinbot.config.yaml"))
-    val (client, pinboards) = Config.read(configFile)
+    val (client, pinboards) = Config.read(configFile) {
+        retryOptions = RetryOptions(Duration.ofSeconds(10), Duration.ofMinutes(30), 8, Schedulers.elastic())
+    }
     fun onGuild(snowflake: Snowflake?, closure: Pinboard.() -> Unit) = pinboards[snowflake]?.let { it.closure() }
 
     //Listen to pin events

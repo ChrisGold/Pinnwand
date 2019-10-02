@@ -1,12 +1,9 @@
 import discord4j.core.DiscordClient
 import discord4j.core.DiscordClientBuilder
 import discord4j.core.`object`.util.Snowflake
-import discord4j.gateway.retry.RetryOptions
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.Constructor
-import reactor.core.scheduler.Schedulers
 import java.io.File
-import java.time.Duration
 
 /**
  * An instance of a processed configuration file
@@ -14,12 +11,12 @@ import java.time.Duration
 data class Config(val client: DiscordClient, val pinboards: Map<Snowflake, Pinboard>) {
     companion object {
         private val yaml = Yaml(Constructor(YAMLConfig::class.java))
-        fun read(file: File): Config {
+        fun read(file: File, discordClientConfig: DiscordClientBuilder.() -> Unit): Config {
             val configData = yaml.load<YAMLConfig>(file.reader())
             val tokenFile = configData.token
             val token = File(tokenFile).readText()
             val client = DiscordClientBuilder(token).run {
-                retryOptions = RetryOptions(Duration.ofSeconds(10), Duration.ofMinutes(5), 8, Schedulers.elastic())
+                discordClientConfig()
                 build()
             }
             val pinboardConfigs = configData.guilds
