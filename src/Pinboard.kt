@@ -8,11 +8,8 @@ import discord4j.core.event.domain.message.MessageDeleteEvent
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
 import discord4j.rest.http.client.ClientException
-import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import java.time.Instant
 import java.util.*
-import java.util.stream.Collectors
 
 class Pinboard(
     val client: DiscordClient,
@@ -26,20 +23,22 @@ class Pinboard(
      */
     operator fun invoke(reactionAddEvent: ReactionAddEvent) =
         reactionAddEvent.message.subscribe { message ->
-            PinPostData.from(message)?.let { pinPostData ->
-                //Has the post been pinned before?
-                val pinboardPost = PinDB.findPinboardPost(pinPostData.messageId)
-                when (pinboardPost) {
-                    null -> {
-                        //Post hasn't been pinned yet
-                        if (pinPostData.pinCount >= pinThreshold) {
-                            pin(pinPostData)
+            if (isPinnable(message)) {
+                PinPostData.from(message).let { pinPostData ->
+                    //Has the post been pinned before?
+                    val pinboardPost = PinDB.findPinboardPost(pinPostData.messageId)
+                    when (pinboardPost) {
+                        null -> {
+                            //Post hasn't been pinned yet
+                            if (pinPostData.pinCount >= pinThreshold) {
+                                pin(pinPostData)
+                            }
                         }
-                    }
-                    else -> {
-                        //Post has been pinned already
-                        if (pinPostData.pinCount >= pinThreshold) {
-                            update(pinPostData, pinboardPost)
+                        else -> {
+                            //Post has been pinned already
+                            if (pinPostData.pinCount >= pinThreshold) {
+                                update(pinPostData, pinboardPost)
+                            }
                         }
                     }
                 }
@@ -52,13 +51,15 @@ class Pinboard(
     operator fun invoke(reactionRemoveEvent: ReactionRemoveEvent) =
         reactionRemoveEvent.message.subscribe { message ->
             PinDB.findPinboardPost(message.id)?.let { pinboardPost ->
-                PinPostData.from(message)?.let { pinPostData ->
-                    if (pinPostData.pinCount < pinThreshold) {
-                        unpin(pinPostData, pinboardPost)
-                    } else if (pinPostData.pinCount >= pinThreshold) {
-                        update(pinPostData, pinboardPost)
+                if (isPinnable(message)) {
+                    PinPostData.from(message).let { pinPostData ->
+                        if (pinPostData.pinCount < pinThreshold) {
+                            unpin(pinPostData, pinboardPost)
+                        } else if (pinPostData.pinCount >= pinThreshold) {
+                            update(pinPostData, pinboardPost)
+                        }
                     }
-                } ?: unpin(null, pinboardPost)
+                } else unpin(null, pinboardPost)
             }
         }
 
@@ -80,8 +81,8 @@ class Pinboard(
         } else if (content.startsWith("*rescan")) {
             val messagesBack = content.split(" ")[1].toInt()
             require(messagesBack > 0) { "Number of messages to go back must be positive! messagesBack = $messagesBack" }
-            syncDB()
-            rescan(messagesBack)
+            val rescan = Rescan(this)
+            rescan()
         }
     }
 
@@ -189,59 +190,9 @@ class Pinboard(
         }.subscribe()
     }
 
-    private fun syncDB() {
-        /*
-        There can be two type of inconsistencies between the pinboard channel and the DB
-        I.  A post exists in the channel but not in the DB
-            Resolution: Put post in DB
-        II. A post exists in the DB but not in the channel
-            Resolution: Delete post from DB
-        */
-        client.getChannelById(pinboardChannelId).flatMapMany { channel ->
-            channel as MessageChannel    //Precondition
-            channel.getMessagesBefore(Snowflake.of(Instant.now())).filter {
-                it.author.k?.id == client.selfId.k
-            }.take(2000)
-        }.map { message ->
-            val pinboardPostId = message.id
-            val embed = message.embeds.firstOrNull()
-            embed?.let { embed ->
-                extractInfo(embed)?.let { (pinnedPostId, pinCount) ->
-                    val entry = PinDB.findPinboardPost(pinnedPostId)
-                    val author = message.author.k?.id ?: Snowflake.of(0L)
-                    if (entry != pinboardPostId) {
-                        if (entry != null) {
-                            PinDB.unregisterPinnedPost(entry)
-                        }
-                        PinDB.recordPinning(pinboardPostId, author, pinnedPostId, pinCount)
-                    }
-                    pinnedPostId
-                }
-            }
-        }.filter(Objects::nonNull).map { it!! }.collect(Collectors.toSet()).subscribe { pinnedPosts ->
-            val pinnedPostsInDB = PinDB.allPinnedPosts()
-            for (pinnedPostInDB in pinnedPostsInDB) {
-                if (!pinnedPosts.contains(pinnedPostInDB)) {
-                    PinDB.removePinning(pinnedPostInDB)
-                }
-            }
-        }
+    fun isPinnable(message: Message): Boolean {
+        return message.reactions.find { isPinEmoji(it.emoji) && it.count >= pinThreshold } != null
     }
-
-    private fun rescan(messagesBack: Int) =
-        client.getGuildById(guildId).flatMapMany {
-            it.channels.flatMap { channel ->
-                if (channel is MessageChannel) {
-                    channel.getMessagesBefore(Snowflake.of(Instant.now()))
-                        .take(messagesBack.toLong())
-                        .map(PinPostData.Companion::from)
-                        .filter(Objects::nonNull)
-                        .map { it!! }
-                } else Flux.empty<PinPostData>()
-            }
-        }.subscribe {
-            TODO()
-        }
 
 }
 
@@ -254,19 +205,17 @@ data class PinPostData(
     val image: Embed.Image?
 ) {
     companion object {
-        fun from(message: Message): PinPostData? {
+        fun from(message: Message): PinPostData {
             val pinReaction = message.reactions.firstOrNull { isPinEmoji(it.emoji) }
-            return if (pinReaction != null) {
-                val image = message.embeds.getOrNull(0)?.image?.k
-                PinPostData(
-                    message.id,
-                    message.content.k,
-                    message.channelId,
-                    message.author.k?.id,
-                    pinReaction.count,
-                    image
-                )
-            } else null
+            val image = message.embeds.getOrNull(0)?.image?.k
+            return PinPostData(
+                message.id,
+                message.content.k,
+                message.channelId,
+                message.author.k?.id,
+                pinReaction?.count ?: 0,
+                image
+            )
         }
     }
 }

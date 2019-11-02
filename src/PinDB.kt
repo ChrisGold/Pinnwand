@@ -46,12 +46,6 @@ object PinDB {
         }
     }
 
-    fun unregisterPinnedPost(pinnedPost: Snowflake) = transaction(db) {
-        PinboardPosts.deleteWhere {
-            PinboardPosts.pinnedPost eq pinnedPost.asLong()
-        }
-    }
-
     /**
      * Update the pin count on a pinboard post
      */
