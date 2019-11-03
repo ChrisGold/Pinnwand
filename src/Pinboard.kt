@@ -79,8 +79,6 @@ class Pinboard(
                 displayLeaderboard(it)
             }
         } else if (content.startsWith("*rescan")) {
-            val messagesBack = content.split(" ")[1].toInt()
-            require(messagesBack > 0) { "Number of messages to go back must be positive! messagesBack = $messagesBack" }
             val rescan = Rescan(this)
             rescan()
         }
