@@ -1,5 +1,6 @@
 import discord4j.core.`object`.entity.Message
-import discord4j.core.`object`.entity.MessageChannel
+import discord4j.core.`object`.entity.TextChannel
+import discord4j.core.`object`.util.Permission
 import discord4j.core.`object`.util.Snowflake
 import reactor.core.publisher.Flux
 import java.time.Instant
@@ -17,9 +18,11 @@ class Rescan(val pinboard: Pinboard) {
     }
 
     fun getPinnedPosts(): Flux<Message> {
-        val oneYearAgo = Instant.now().minus(1, ChronoUnit.MONTHS)
+        logger.info("Getting a list of all channels")
         val channels = getChannels()
+        val oneYearAgo = Instant.now().minus(30, ChronoUnit.DAYS)
         val chunks = channels.flatMap { channel ->
+            logger.info("Checking channel: ${channel.name}")
             channel.getMessagesAfter(Snowflake.of(oneYearAgo)).filter {
                 pinboard.isPinnable(it)
             }
@@ -30,13 +33,15 @@ class Rescan(val pinboard: Pinboard) {
         }
     }
 
-    private fun getChannels(): Flux<MessageChannel> {
-        val guild = client.getGuildById(pinboard.guildId)
-        val channels = guild.flatMapMany { it.channels }
-        return channels.filter {
-            it is MessageChannel
-        }.map {
-            it as MessageChannel
-        }
+    private val readAccess = setOf(Permission.READ_MESSAGE_HISTORY, Permission.VIEW_CHANNEL)
+    private fun getChannels(): Flux<TextChannel> {
+        return client.getGuildById(pinboard.guildId)
+            .flatMapMany { it.channels }
+            .ofType(TextChannel::class.java)
+            .filterWhen {
+                it.getEffectivePermissions(client.selfId.get()).map {
+                    it.containsAll(readAccess)
+                }
+            }
     }
 }
