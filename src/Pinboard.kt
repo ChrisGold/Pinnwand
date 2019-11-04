@@ -94,6 +94,7 @@ class Pinboard(
         logger.info("Pinning $pinPostData")
         createPinPost(pinPostData).subscribe {
             PinDB.recordPinning(
+                guildId,
                 it.id,
                 pinPostData.author ?: Snowflake.of(0),
                 pinPostData.messageId,
@@ -176,7 +177,7 @@ class Pinboard(
     }
 
     private fun displayLeaderboard(channel: MessageChannel) {
-        val leaderboard = PinDB.tallyLeaderboard()
+        val leaderboard = PinDB.tallyLeaderboard(guildId)
         val (positions, users, pins) = display(leaderboard)
         channel.createMessage {
             it.setEmbed {

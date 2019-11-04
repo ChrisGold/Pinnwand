@@ -27,10 +27,17 @@ object PinDB {
     /**
      * Record a new pinned post
      */
-    fun recordPinning(pinboardPostId: Snowflake, author: Snowflake, pinnedPost: Snowflake, pinCount: Int) =
+    fun recordPinning(
+        guildId: Snowflake,
+        pinboardPostId: Snowflake,
+        author: Snowflake,
+        pinnedPost: Snowflake,
+        pinCount: Int
+    ) =
         transaction(db) {
             PinboardPost.new {
                 this.pinboardPost = EntityID(pinboardPostId.asLong(), PinboardPosts)
+                this.guild = guildId.asLong()
                 this.author = author.asLong()
                 this.pinnedPost = pinnedPost.asLong()
                 this.pinCount = pinCount
@@ -66,10 +73,10 @@ object PinDB {
         }
     }
 
-    fun tallyLeaderboard() = transaction {
+    fun tallyLeaderboard(guildId: Snowflake) = transaction {
         //TODO: Make this respect different guilds
         val results = PinboardPosts.slice(PinboardPosts.author, PinboardPosts.pinCount.sum())
-            .selectAll()
+            .select { PinboardPosts.guild eq guildId.asLong() }
             .groupBy(PinboardPosts.author)
             .execute(this)
         val list = ArrayList<LeaderboardEntry>()
@@ -92,6 +99,7 @@ object PinDB {
 }
 
 object PinboardPosts : LongIdTable("pinboard_posts") {
+    val guild = long("guild")
     val author = long("author")
     val pinnedPost = long("pinned_post")
     val pinCount = integer("pin_count")
@@ -101,6 +109,7 @@ class PinboardPost(pinboardPost: EntityID<Long>) : Entity<Long>(pinboardPost) {
     companion object : EntityClass<Long, PinboardPost>(PinboardPosts)
 
     var pinboardPost by PinboardPosts.id
+    var guild by PinboardPosts.guild
     var author by PinboardPosts.author
     var pinnedPost by PinboardPosts.pinnedPost
     var pinCount by PinboardPosts.pinCount
