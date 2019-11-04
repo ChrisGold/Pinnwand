@@ -34,9 +34,20 @@ class Rescan(val pinboard: Pinboard) {
 
         //Ensure all existing posts are pinned
         //Go through all pinnedPosts:
-        //If pinnedPost is on pinboard, update
-        //If pinnedPost is not on pinboard, pin
-        //Record pinning
+        pinnedPosts.forEach { ppd ->
+            val pinboardPost = pinboardPostsByMessage[ppd.messageId]
+            val updatedPost = if (pinboardPost != null) {
+                //If pinnedPost is on pinboard, update
+                pinboard.updatePinPost(pinboardPost.id, ppd)
+            } else {
+                //If pinnedPost is not on pinboard, pin
+                pinboard.createPinPost(ppd)
+            }
+            updatedPost.subscribe {
+                //Record pinning
+                PinDB.recordPinning(pinboard.guildId, it.id, ppd.author ?: Snowflake.of(0), ppd.messageId, ppd.pinCount)
+            }
+        }
 
         //Go through all pinboardPosts
         //If pinboardPost is not pinned, delete
