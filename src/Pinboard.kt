@@ -31,8 +31,7 @@ class Pinboard(
                 if (isPinnable(message)) {
                     PinPostData.from(message).let { pinPostData ->
                         //Has the post been pinned before?
-                        val pinboardPost = PinDB.findPinboardPost(pinPostData.messageId)
-                        when (pinboardPost) {
+                        when (val pinboardPost = PinDB.findPinboardPost(pinPostData.messageId)) {
                             null -> {
                                 //Post hasn't been pinned yet
                                 if (pinPostData.pinCount >= pinThreshold) {
@@ -155,7 +154,7 @@ class Pinboard(
         pinboardPost: Snowflake,
         pinPostData: PinPostData
     ): Mono<Message> = pinPostData.run {
-        val link = channel?.let {
+        val link = channel.let {
             "https://discordapp.com/channels/${guildId.asString()}/${channel.asString()}/${messageId.asString()}"
         }
         client.getMessageById(pinboardChannelId, pinboardPost).doOnError {
@@ -216,9 +215,9 @@ class Pinboard(
 
 data class PinPostData(
     val messageId: Snowflake,
-    val message: String?,
-    val channel: Snowflake?,
-    val author: Snowflake?,
+    val message: String,
+    val channel: Snowflake,
+    val author: Snowflake,
     val pinCount: Int,
     val image: Embed.Image?
 ) {
@@ -228,9 +227,9 @@ data class PinPostData(
             val image = message.embeds.getOrNull(0)?.image?.k
             return PinPostData(
                 message.id,
-                message.content.k,
+                message.content.k ?: "<empty>",
                 message.channelId,
-                message.author.k?.id,
+                message.author.k?.id ?: Snowflake.of(0),
                 pinReaction?.count ?: 0,
                 image
             )
