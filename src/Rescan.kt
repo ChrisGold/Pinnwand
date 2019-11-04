@@ -11,6 +11,7 @@ class Rescan(val pinboard: Pinboard) {
     private val client = pinboard.client
 
     operator fun invoke() {
+        pinboard.disable()
         logger.info("Getting all posts on the pinboard")
         val pinboardPosts = getPostsOnPinboard().blockingCollect()
         logger.info("Found ${pinboardPosts.size} posts on pinboard channel")
@@ -18,7 +19,9 @@ class Rescan(val pinboard: Pinboard) {
         val pinnedPosts = getPinnedPosts().blockingCollect()
         logger.info("Found ${pinnedPosts.size} pinned posts")
 
-        val pinboardPostIds = pinboardPosts.map { it.messageId.asLong() }.toSet()
+        val pinboardPostsByMessage =
+            pinboardPosts.map { (pinboardPost, pinnedPostData) -> pinnedPostData.messageId to pinboardPost }.toMap()
+        val pinboardPostIds = pinboardPostsByMessage.map { it.key.asLong() }.toSet()
         val pinnedPostIds = pinnedPosts.map { it.messageId.asLong() }.toSet()
 
         val unposted = pinboardPostIds - pinnedPostIds
@@ -26,6 +29,18 @@ class Rescan(val pinboard: Pinboard) {
 
         val falselyPosted = pinnedPostIds - pinboardPostIds
         logger.info("${falselyPosted.size} posts on the pinboard have not been posted.")
+
+        PinDB.truncateGuild(pinboard.guildId)
+
+        //Ensure all existing posts are pinned
+        //Go through all pinnedPosts:
+        //If pinnedPost is on pinboard, update
+        //If pinnedPost is not on pinboard, pin
+        //Record pinning
+
+        //Go through all pinboardPosts
+        //If pinboardPost is not pinned, delete
+        pinboard.enable()
     }
 
     private val oneMonthAgo = Instant.now().minus(30, ChronoUnit.DAYS)
@@ -61,9 +76,16 @@ class Rescan(val pinboard: Pinboard) {
             it as TextChannel
             it.getMessagesAfter(Snowflake.of(oneMonthAgo)).filter {
                 it.author.k?.id == client.selfId.k
-            }.map { it.extractLink().o }.filter { it.isPresent }.map { it.get() }
-                .map { decomposeLink(it) }.flatMap { client.getMessageById(it.channelId, it.messageId) }
-                .map { PinPostData.from(it) }
+            }
+                .map { it to it.extractLink().o }
+                .filter { (pinboardMessage, link) -> link.isPresent }
+                .map { (pinboardMessage, link) -> pinboardMessage to link.get() }
+                .map { (pinboardMessage, link) -> pinboardMessage to decomposeLink(link) }
+                .flatMap { (pinboardMessage, link) ->
+                    client.getMessageById(link.channelId, link.messageId)
+                        .map { pinboardMessage to it }
+                }
+                .map { (pinboardMessage, link) -> pinboardMessage to PinPostData.from(link) }
         }
 
     private fun <T> Flux<T>.blockingCollect() = collect(Collectors.toList()).block()

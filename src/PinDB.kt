@@ -96,6 +96,12 @@ object PinDB {
     fun allPinnedPosts() = transaction {
         PinboardPosts.slice(PinboardPosts.pinnedPost).selectAll().map { Snowflake.of(it[PinboardPosts.pinnedPost]) }
     }
+
+    fun truncateGuild(guildId: Snowflake) = transaction {
+        PinboardPosts.deleteWhere {
+            PinboardPosts.guild eq guildId.asLong()
+        }
+    }
 }
 
 object PinboardPosts : LongIdTable("pinboard_posts") {

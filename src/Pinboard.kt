@@ -10,6 +10,7 @@ import discord4j.core.event.domain.message.ReactionRemoveEvent
 import discord4j.rest.http.client.ClientException
 import reactor.core.publisher.Mono
 import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
 
 class Pinboard(
     val client: DiscordClient,
@@ -18,69 +19,83 @@ class Pinboard(
     val pinboardChannelId: Snowflake,
     val pinThreshold: Int = 5
 ) {
+
+    private val enabled = AtomicBoolean(true)
+
     /**
      * Register a [ReactionAddEvent] with this pinboard
      */
-    operator fun invoke(reactionAddEvent: ReactionAddEvent) =
-        reactionAddEvent.message.subscribe { message ->
-            if (isPinnable(message)) {
-                PinPostData.from(message).let { pinPostData ->
-                    //Has the post been pinned before?
-                    val pinboardPost = PinDB.findPinboardPost(pinPostData.messageId)
-                    when (pinboardPost) {
-                        null -> {
-                            //Post hasn't been pinned yet
-                            if (pinPostData.pinCount >= pinThreshold) {
-                                pin(pinPostData)
+    operator fun invoke(reactionAddEvent: ReactionAddEvent) {
+        if (enabled.get()) {
+            reactionAddEvent.message.subscribe { message ->
+                if (isPinnable(message)) {
+                    PinPostData.from(message).let { pinPostData ->
+                        //Has the post been pinned before?
+                        val pinboardPost = PinDB.findPinboardPost(pinPostData.messageId)
+                        when (pinboardPost) {
+                            null -> {
+                                //Post hasn't been pinned yet
+                                if (pinPostData.pinCount >= pinThreshold) {
+                                    pin(pinPostData)
+                                }
                             }
-                        }
-                        else -> {
-                            //Post has been pinned already
-                            if (pinPostData.pinCount >= pinThreshold) {
-                                update(pinPostData, pinboardPost)
+                            else -> {
+                                //Post has been pinned already
+                                if (pinPostData.pinCount >= pinThreshold) {
+                                    update(pinPostData, pinboardPost)
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
 
     /**
      * Register a [ReactionRemoveEvent] with this pinboard
      */
-    operator fun invoke(reactionRemoveEvent: ReactionRemoveEvent) =
-        reactionRemoveEvent.message.subscribe { message ->
-            PinDB.findPinboardPost(message.id)?.let { pinboardPost ->
-                if (isPinnable(message)) {
-                    PinPostData.from(message).let { pinPostData ->
-                        if (pinPostData.pinCount < pinThreshold) {
-                            unpin(pinPostData, pinboardPost)
-                        } else if (pinPostData.pinCount >= pinThreshold) {
-                            update(pinPostData, pinboardPost)
+    operator fun invoke(reactionRemoveEvent: ReactionRemoveEvent) {
+        if (enabled.get()) {
+            reactionRemoveEvent.message.subscribe { message ->
+                PinDB.findPinboardPost(message.id)?.let { pinboardPost ->
+                    if (isPinnable(message)) {
+                        PinPostData.from(message).let { pinPostData ->
+                            if (pinPostData.pinCount < pinThreshold) {
+                                unpin(pinPostData, pinboardPost)
+                            } else if (pinPostData.pinCount >= pinThreshold) {
+                                update(pinPostData, pinboardPost)
+                            }
                         }
-                    }
-                } else unpin(null, pinboardPost)
+                    } else unpin(null, pinboardPost)
+                }
             }
         }
+    }
 
     operator fun invoke(messageDeleteEvent: MessageDeleteEvent) {
-        val messageId = messageDeleteEvent.messageId
-        PinDB.findPinboardPost(messageId)?.let {
-            PinDB.removePinning(it)
-            deletePinPost(it)
+        if (enabled.get()) {
+            val messageId = messageDeleteEvent.messageId
+            PinDB.findPinboardPost(messageId)?.let {
+                PinDB.removePinning(it)
+                deletePinPost(it)
+            }
         }
     }
 
     operator fun invoke(messageCreateEvent: MessageCreateEvent) {
-        val message = messageCreateEvent.message
-        val content = message.content.k ?: return
-        if (content.startsWith("*leaderboard")) {
-            message.channel.subscribe {
-                displayLeaderboard(it)
+        if (enabled.get()) {
+            val message = messageCreateEvent.message
+            val content = message.content.k ?: return
+            if (content.startsWith("*leaderboard")) {
+                message.channel.subscribe {
+                    displayLeaderboard(it)
+                }
+            } else if (content.startsWith("*rescan")) {
+                val rescan = Rescan(this)
+                rescan()
             }
-        } else if (content.startsWith("*rescan")) {
-            val rescan = Rescan(this)
-            rescan()
         }
     }
 
@@ -113,7 +128,7 @@ class Pinboard(
         }
     }
 
-    private fun createPinPost(
+    fun createPinPost(
         pinPostData: PinPostData
     ): Mono<Message> = pinPostData.run {
         client.getChannelById(pinboardChannelId).map { it as MessageChannel }.flatMap { pinboardChannel ->
@@ -136,7 +151,7 @@ class Pinboard(
         }
     }
 
-    private fun updatePinPost(
+    fun updatePinPost(
         pinboardPost: Snowflake,
         pinPostData: PinPostData
     ): Mono<Message> = pinPostData.run {
@@ -165,7 +180,7 @@ class Pinboard(
         }
     }
 
-    private fun deletePinPost(pinboardPost: Snowflake) {
+    fun deletePinPost(pinboardPost: Snowflake) {
         client.getMessageById(pinboardChannelId, pinboardPost).flatMap {
             it.delete()
         }.doOnError {
@@ -192,6 +207,10 @@ class Pinboard(
     fun isPinnable(message: Message): Boolean {
         return message.reactions.find { isPinEmoji(it.emoji) && it.count >= pinThreshold } != null
     }
+
+    fun enable() = enabled.set(true);
+
+    fun disable() = enabled.set(false);
 
 }
 
