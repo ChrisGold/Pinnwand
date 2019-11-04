@@ -58,6 +58,7 @@ fun isPinEmoji(emoji: ReactionEmoji): Boolean {
  * Helper method for transforming Java optionals into Kotlin nullables
  */
 val <T> Optional<T>.k get() = if (this.isPresent) this.get() else null
+val <T> T?.o get() = Optional.ofNullable(this)
 
 const val pin = "\uD83D\uDCCC"
 val logger = LogManager.getLogger("eu.goldapp.Pinnwand")

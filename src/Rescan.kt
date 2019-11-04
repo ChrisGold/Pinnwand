@@ -61,7 +61,7 @@ class Rescan(val pinboard: Pinboard) {
             it as TextChannel
             it.getMessagesAfter(Snowflake.of(oneMonthAgo)).filter {
                 it.author.k?.id == client.selfId.k
-            }.map { it.extractLink() }.filter { it != null }.map { it as String }
+            }.map { it.extractLink().o }.filter { it.isPresent }.map { it.get() }
                 .map { decomposeLink(it) }.flatMap { client.getMessageById(it.channelId, it.messageId) }
                 .map { PinPostData.from(it) }
         }
