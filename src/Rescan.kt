@@ -3,6 +3,7 @@ import discord4j.core.`object`.entity.TextChannel
 import discord4j.core.`object`.util.Permission
 import discord4j.core.`object`.util.Snowflake
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.stream.Collectors
@@ -20,7 +21,8 @@ class Rescan(val pinboard: Pinboard) {
         logger.info("Found ${pinnedPosts.size} pinned posts")
 
         val pinboardPostsByMessage =
-            pinboardPosts.map { (pinboardPost, pinnedPostData) -> pinnedPostData.messageId to pinboardPost }.toMap()
+            pinboardPosts.mapNotNull { (pinboardPost, pinnedPostData) -> pinnedPostData?.let { it.messageId to pinboardPost } }
+                .toMap()
         val pinboardPostIds = pinboardPostsByMessage.map { it.key.asLong() }.toSet()
         val pinnedPostIds = pinnedPosts.map { it.messageId.asLong() }.toSet()
 
@@ -50,7 +52,12 @@ class Rescan(val pinboard: Pinboard) {
         }
 
         //Go through all pinboardPosts
-        //If pinboardPost is not pinned, delete
+        pinboardPosts.forEach { (pinboardPost, pinnedMessage) ->
+            //If pinboardPost is not pinned, delete
+            if (pinnedMessage == null) {
+                pinboard.deletePinPost(pinboardPost.id)
+            }
+        }
         pinboard.enable()
     }
 
@@ -93,10 +100,14 @@ class Rescan(val pinboard: Pinboard) {
                 .map { (pinboardMessage, link) -> pinboardMessage to link.get() }
                 .map { (pinboardMessage, link) -> pinboardMessage to decomposeLink(link) }
                 .flatMap { (pinboardMessage, link) ->
-                    client.getMessageById(link.channelId, link.messageId)
-                        .map { pinboardMessage to it }
+                    try {
+                        client.getMessageById(link.channelId, link.messageId)
+                            .map { pinboardMessage to it }
+                    } catch (ex: Exception) {
+                        Mono.just(pinboardMessage to null)
+                    }
                 }
-                .map { (pinboardMessage, link) -> pinboardMessage to PinPostData.from(link) }
+                .map { (pinboardMessage, link) -> pinboardMessage to link?.let { PinPostData.from(link) } }
         }
 
     private fun <T> Flux<T>.blockingCollect() = collect(Collectors.toList()).block()
