@@ -169,7 +169,7 @@ class Pinboard(
                 edit.setContent("A post from $mention was pinned.")
                 edit.setEmbed { embed ->
                     embed.setDescription("[Link to Post]($link)")
-                    embed.addField("Content", message ?: "null", false)
+                    embed.addField("Content", message, false)
                     embed.addField("Author", mention, true)
                     embed.addField("Channel", channel, true)
                     embed.setFooter("$pin $pinCount pushpins", null)
