@@ -17,6 +17,7 @@ class PinDB(val dbConfig: DBConfig) {
         transaction(db) {
             //Ensure that all tables are present
             SchemaUtils.createMissingTablesAndColumns(Guilds)
+            SchemaUtils.createMissingTablesAndColumns(PinnedMessages)
         }
     }
 
@@ -24,6 +25,19 @@ class PinDB(val dbConfig: DBConfig) {
         guilds.forEach {
             val guild = Guild.fromPinboard(it)
             println("Registering guild: $guild")
+        }
+    }
+
+    fun registerPinning(guild: Long, message: Long, author: Long, pinCount: Int) = transaction {
+        val existing = PinnedMessage.findById(message)
+        if (existing == null) {
+            PinnedMessage.new(message) {
+                this.author = author
+                this.guild = Guild.findById(guild)!!
+                this.pinCount = pinCount
+            }
+        } else {
+            existing.pinCount = pinCount
         }
     }
 }

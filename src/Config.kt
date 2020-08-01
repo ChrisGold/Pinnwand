@@ -21,14 +21,14 @@ data class Config(val client: DiscordClient, val db: PinDB, val pinboards: Map<S
                 build()
             }
             val pinboardConfigs = configData.guilds
+            val pinDB = PinDB(configData.database)
             val pinboards = pinboardConfigs.map {
                 val guild = it.guild
                 val guildId = Snowflake.of(it.guildId)
                 val pinboardChannelId = Snowflake.of(it.pinboardChannel)
                 val pin = it.pin
-                guildId to Pinboard(client, guild, guildId, pinboardChannelId, pin, it.threshold)
+                guildId to Pinboard(client, pinDB, guild, guildId, pinboardChannelId, pin, it.threshold)
             }.toMap()
-            val pinDB = PinDB(configData.database)
             pinDB.registerGuilds(pinboards.values)
             return Config(client, pinDB, pinboards)
         }
