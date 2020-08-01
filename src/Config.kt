@@ -1,3 +1,4 @@
+import db.PinDB
 import discord4j.core.DiscordClient
 import discord4j.core.DiscordClientBuilder
 import discord4j.core.`object`.util.Snowflake
@@ -8,7 +9,7 @@ import java.io.File
 /**
  * An instance of a processed configuration file
  */
-data class Config(val client: DiscordClient, val pinboards: Map<Snowflake, Pinboard>) {
+data class Config(val client: DiscordClient, val db: PinDB, val pinboards: Map<Snowflake, Pinboard>) {
     companion object {
         private val yaml = Yaml(Constructor(YAMLConfig::class.java))
         fun read(file: File, discordClientConfig: DiscordClientBuilder.() -> Unit): Config {
@@ -27,12 +28,17 @@ data class Config(val client: DiscordClient, val pinboards: Map<Snowflake, Pinbo
                 val pin = it.pin
                 guildId to Pinboard(client, guild, guildId, pinboardChannelId, pin, it.threshold)
             }.toMap()
-            return Config(client, pinboards)
+            val pinDB = PinDB(configData.database)
+            return Config(client, pinDB, pinboards)
         }
     }
 }
 
-data class YAMLConfig(var token: String = "", var guilds: List<YAMLPinboard> = emptyList())
+data class YAMLConfig(
+    var token: String = "",
+    var database: DBConfig = DBConfig(),
+    var guilds: List<YAMLPinboard> = emptyList()
+)
 
 data class YAMLPinboard(
     var guild: String = "",
@@ -42,6 +48,6 @@ data class YAMLPinboard(
     var threshold: Int = 5
 )
 
-data class DBConfig(val uri: String, val driver: String, val creds: DBCredentials? = null)
+data class DBConfig(var uri: String = "", var driver: String = "", var creds: DBCredentials? = null)
 
-data class DBCredentials(val user: String, val password: String)
+data class DBCredentials(var user: String = "", var password: String = "")

@@ -13,22 +13,18 @@ import java.util.*
 fun main(args: Array<String>) {
     //Read config and build Discord Client
     val configFile = File((args.getOrNull(0) ?: "pinbot.config.yaml"))
-    val (client, pinboards) = Config.read(configFile) {
+    val (client, db, pinboards) = Config.read(configFile) {
         retryOptions = RetryOptions(Duration.ofSeconds(10), Duration.ofMinutes(30), 8, Schedulers.elastic())
     }
     fun onGuild(snowflake: Snowflake?, closure: Pinboard.() -> Unit) = pinboards[snowflake]?.let { it.closure() }
 
     //Listen to react events
-    client.eventDispatcher.on(ReactionAddEvent::class.java).filter {
-        isPinEmoji(it.emoji)
-    }.subscribe { event ->
+    client.eventDispatcher.on(ReactionAddEvent::class.java).subscribe { event ->
         onGuild(event.guildId.k) { addReact(event) }
     }
 
     //Listen to remove-react events
-    client.eventDispatcher.on(ReactionRemoveEvent::class.java).filter {
-        isPinEmoji(it.emoji)
-    }.subscribe { event ->
+    client.eventDispatcher.on(ReactionRemoveEvent::class.java).subscribe { event ->
         onGuild(event.guildId.k) { removeReact(event) }
     }
 

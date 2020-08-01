@@ -19,14 +19,14 @@ class Pinboard(
     }
 
     fun addReact(addEvent: ReactionAddEvent?) {
-        TODO("Not yet implemented")
+        println("Added react: $addEvent")
     }
 
     fun removeReact(event: ReactionRemoveEvent?) {
-        TODO("Not yet implemented")
+        println("Removed react: $event")
     }
 
     fun deleteMessage(deletion: MessageDeleteEvent?) {
-        TODO("Not yet implemented")
+        println("Deleted message: $deletion")
     }
 }
