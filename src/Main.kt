@@ -1,6 +1,5 @@
 import discord4j.core.`object`.reaction.ReactionEmoji
 import discord4j.core.`object`.util.Snowflake
-import discord4j.core.event.domain.message.MessageCreateEvent
 import discord4j.core.event.domain.message.MessageDeleteEvent
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
@@ -19,33 +18,29 @@ fun main(args: Array<String>) {
     }
     fun onGuild(snowflake: Snowflake?, closure: Pinboard.() -> Unit) = pinboards[snowflake]?.let { it.closure() }
 
-    //Listen to pin events
+    //Listen to react events
     client.eventDispatcher.on(ReactionAddEvent::class.java).filter {
         isPinEmoji(it.emoji)
     }.subscribe { event ->
-        onGuild(event.guildId.k) { this(event) }
+        onGuild(event.guildId.k) { addReact(event) }
     }
 
-    //Listen to unpin events
+    //Listen to remove-react events
     client.eventDispatcher.on(ReactionRemoveEvent::class.java).filter {
         isPinEmoji(it.emoji)
     }.subscribe { event ->
-        onGuild(event.guildId.k) { this(event) }
+        onGuild(event.guildId.k) { removeReact(event) }
     }
 
     //Listen to deleted messages
     client.eventDispatcher.on(MessageDeleteEvent::class.java).subscribe { deletion ->
         //MessageDeleteEvent doesn't include the guild, so we send this event to every guild we have
-        pinboards.values.forEach { it(deletion) }
+        pinboards.values.forEach { it.deleteMessage(deletion) }
     }
 
-    client.eventDispatcher.on(MessageCreateEvent::class.java).subscribe { event ->
-        onGuild(event.guildId.k) { this(event) }
-    }
     //Login
     client.login().block()
 }
-
 
 /**
  * A ReactionEmoji is a pin emoji if and only if it is the Unicode "📌"
