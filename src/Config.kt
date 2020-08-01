@@ -41,3 +41,7 @@ data class YAMLPinboard(
     var pin: String = "",
     var threshold: Int = 5
 )
+
+data class DBConfig(val uri: String, val driver: String, val creds: DBCredentials? = null)
+
+data class DBCredentials(val user: String, val password: String)
