@@ -6,12 +6,12 @@ import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
 
 class Pinboard(
-    client: DiscordClient,
-    guild: String,
-    guildId: Snowflake,
-    pinboardChannelId: Snowflake,
-    pin: String,
-    threshold: Int
+    val client: DiscordClient,
+    val guild: String,
+    val guildId: Snowflake,
+    val pinboardChannelId: Snowflake,
+    val pin: String,
+    val threshold: Int
 ) {
     fun isPinEmoji(emoji: ReactionEmoji): Boolean {
         return emoji.asUnicodeEmoji().let { it.isPresent && it.get().toString() == pin } || emoji.asCustomEmoji()
@@ -29,4 +29,5 @@ class Pinboard(
     fun deleteMessage(deletion: MessageDeleteEvent?) {
         println("Deleted message: $deletion")
     }
+
 }

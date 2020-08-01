@@ -29,6 +29,7 @@ data class Config(val client: DiscordClient, val db: PinDB, val pinboards: Map<S
                 guildId to Pinboard(client, guild, guildId, pinboardChannelId, pin, it.threshold)
             }.toMap()
             val pinDB = PinDB(configData.database)
+            pinDB.registerGuilds(pinboards.values)
             return Config(client, pinDB, pinboards)
         }
     }
