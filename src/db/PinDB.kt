@@ -58,6 +58,12 @@ class PinDB(val dbConfig: DBConfig) {
                     this.imageUrl = imageUrl
                 }
         }
+
+    fun findPinboardPost(originalMessage: Long) = transaction {
+        PinboardPost.find {
+            PinboardPosts.message eq originalMessage
+        }.toList().getOrNull(0)
+    }
 }
 
 private fun DBConfig.connect(): Database {
