@@ -46,8 +46,8 @@ class Pinboard(
             )
             //Register post in DB
             db.registerPinning(guildId.asLong(), message.id.asLong(), author.id.asLong(), pins)
-            getPinboardPost(message.id).subscribe { pinboardMessage ->
-                bindData(message, pins, pinboardMessage)
+            getPinboardPost(message).subscribe { pinboardMessage ->
+                bindData(message, pins, pinboardMessage).subscribe()
             }
         }
     }
@@ -60,11 +60,14 @@ class Pinboard(
         logger.trace("Deleted message: $deletion")
     }
 
-    fun getPinboardPost(messageId: Snowflake): Mono<Message> =
-        db.findPinboardPost(messageId.asLong())?.let {
+    fun getPinboardPost(message: Message): Mono<Message> {
+        return db.findPinboardPost(message.id.asLong())?.let {
             client.getMessageById(pinboardChannelId, Snowflake.of(it.id.value))
         }
-            ?: pinboardChannel.createEmptyMessage()
+            ?: pinboardChannel.createEmptyMessage().doOnSuccess {
+                db.savePinboardPost(guildId.asLong(), it.id.asLong(), message.id.asLong(), message.content.k.orEmpty())
+            }
+    }
 
     private fun mentionUser(user: Snowflake?): String = "<@!${user?.asString()}>"
 

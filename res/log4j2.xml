@@ -21,7 +21,7 @@
             <AppenderRef ref="Console"/>
             <AppenderRef ref="rollingFile"/>
         </Root>
-        <Logger name="eu.goldapp.Pinnwand" level="trace" additivity="false">
+        <Logger name="eu.goldapp.Pinnwand" level="info" additivity="false">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="rollingFile"/>
         </Logger>

@@ -6,6 +6,6 @@ import reactor.core.publisher.Mono
 
 class PinboardChannel(val client: DiscordClient, val guildId: Snowflake, val channel: MessageChannel) {
     fun createEmptyMessage(): Mono<Message> {
-        return channel.createMessage("Under construction")
+        return channel.createMessage("...")
     }
 }
