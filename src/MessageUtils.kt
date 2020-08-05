@@ -35,3 +35,8 @@ fun decomposeLink(link: String): MessageData {
     val (guild, channel, message) = content.split('/').map { Snowflake.of(it) }
     return MessageData(guild, channel, message)
 }
+
+fun mentionUser(user: Snowflake?): String = "<@!${user?.asString()}>"
+
+val Long.sf: Snowflake
+    get() = Snowflake.of(this)

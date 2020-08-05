@@ -58,7 +58,7 @@ class Pinboard(
                 //Register post in DB
                 db.registerPinning(guildId.asLong(), message.id.asLong(), author.id.asLong(), pins)
                 getPinboardPost(message).subscribe { pinboardMessage ->
-                    bindData(message, pins, pinboardMessage).subscribe()
+                    pinboardChannel.bindData(message, pins, pinboardMessage).subscribe()
                 }
             }
             //Message should not be pinned
@@ -77,14 +77,10 @@ class Pinboard(
         //Check if message has been pinned before
         val pinboardPost = db.findPinboardPost(messageId.asLong())
         if (pinboardPost != null) {
-            val pinboardMessage = client.getMessageById(pinboardChannelId, Snowflake.of(pinboardPost.id.value))
-            pinboardMessage.map { message ->
-                message.delete().subscribe {
-                    logger.trace("Deleting $message")
-                    db.removePinning(messageId.asLong())
-                    db.removePinboardPost(message.id.asLong())
-                }
-            }.subscribe()
+            val pinboardPostId = pinboardPost.id.value
+            db.removePinning(messageId.asLong())
+            db.removePinboardPost(pinboardPostId)
+            pinboardChannel.deletePost(pinboardPostId.sf)
         }
     }
 
@@ -96,34 +92,4 @@ class Pinboard(
                 db.savePinboardPost(guildId.asLong(), it.id.asLong(), message.id.asLong(), message.content.k.orEmpty())
             }
     }
-
-    private fun mentionUser(user: Snowflake?): String = "<@!${user?.asString()}>"
-
-    private fun bindData(
-        pinnedMessage: Message,
-        pinCount: Int,
-        pinboardPost: Message
-    ): Mono<Message> {
-        val channelId = pinnedMessage.channelId
-        val messageId = pinnedMessage.id
-        val content = pinnedMessage.content.k ?: "<empty>"
-        val imageUrl = pinnedMessage.attachments.toList().getOrNull(0)?.url ?: pinnedMessage.embeds.getOrNull(0)?.url?.k
-        val link = channelId?.let {
-            "https://discordapp.com/channels/${guildId.asString()}/${channelId.asString()}/${messageId.asString()}"
-        }
-        val channel = "<#${channelId?.asString()}>"
-        val mention = mentionUser(pinnedMessage.author.k!!.id)
-        return pinboardPost.edit {
-            it.setContent("A post from $mention was pinned.")
-            it.setEmbed { embed ->
-                embed.setDescription("[Link to Post]($link)")
-                embed.addField("Content", content, false)
-                embed.addField("Author", mention, true)
-                embed.addField("Channel", channel, true)
-                embed.setFooter("$pin $pinCount pushpins", null)
-                imageUrl?.let { embed.setImage(it) }
-            }
-        }
-    }
-
 }
