@@ -25,10 +25,10 @@ class PinboardChannel(val client: DiscordClient, val guildId: Snowflake, val cha
         val messageId = pinnedMessage.id
         val content = pinnedMessage.content.k ?: "<empty>"
         val imageUrl = pinnedMessage.attachments.toList().getOrNull(0)?.url ?: pinnedMessage.embeds.getOrNull(0)?.url?.k
-        val link = channelId?.let {
+        val link = channelId.let {
             "https://discordapp.com/channels/${guildId.asString()}/${channelId.asString()}/${messageId.asString()}"
         }
-        val channel = "<#${channelId?.asString()}>"
+        val channel = "<#${channelId.asString()}>"
         val mention = mentionUser(pinnedMessage.author.k!!.id)
         return pinboardPost.edit {
             it.setContent("A post from $mention was pinned.")

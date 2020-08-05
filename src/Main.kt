@@ -14,7 +14,7 @@ import java.util.*
 fun main(args: Array<String>) {
     //Read config and build Discord Client
     val configFile = File((args.getOrNull(0) ?: "pinbot.config.yaml"))
-    val (client, db, pinboards) = Config.read(configFile) {
+    val (client, _, pinboards) = Config.read(configFile) {
         retryOptions = RetryOptions(Duration.ofSeconds(10), Duration.ofMinutes(30), 8, Schedulers.elastic())
     }
     fun onGuild(snowflake: Snowflake?, closure: Pinboard.() -> Unit) = pinboards[snowflake]?.let { it.closure() }
