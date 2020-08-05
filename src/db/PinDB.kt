@@ -12,7 +12,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import sf
 import java.sql.Connection
 
-class PinDB(val dbConfig: DBConfig) {
+class PinDB(dbConfig: DBConfig) {
     val db = dbConfig.connect()
 
     init {
@@ -82,7 +82,8 @@ class PinDB(val dbConfig: DBConfig) {
             .slice(PinnedMessages.author, PinnedMessages.pinCount.sum(), PinnedMessages.guild)
             .select {
                 PinnedMessages.guild eq guildId
-            }.execute(this)
+            }.groupBy(PinnedMessages.author)
+            .execute(this)
         val list = ArrayList<LeaderboardEntry>()
         results?.let {
             while (it.next()) {
