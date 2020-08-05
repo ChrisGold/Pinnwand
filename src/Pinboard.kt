@@ -19,15 +19,15 @@ class Pinboard(
     val threshold: Int
 ) {
 
-    val pinboardChannel =
+    private val pinboardChannel =
         PinboardChannel(client, guildId, client.getChannelById(pinboardChannelId).block()!! as MessageChannel)
 
-    fun isPinEmoji(emoji: ReactionEmoji): Boolean {
+    private fun isPinEmoji(emoji: ReactionEmoji): Boolean {
         return emoji.asUnicodeEmoji().let { it.isPresent && it.get().raw == pin } || emoji.asCustomEmoji()
             .let { it.isPresent && it.get().name == pin }
     }
 
-    fun countPins(it: Message): Int {
+    private fun countPins(it: Message): Int {
         return it.reactions.find { isPinEmoji(it.emoji) }?.count ?: 0
     }
 
@@ -41,7 +41,7 @@ class Pinboard(
         updateBasedOnMessage(message)
     }
 
-    private fun updateBasedOnMessage(message: Message) {
+    fun updateBasedOnMessage(message: Message) {
         val pins = countPins(message)
         //Ignore non-user posters
         if (message.author.isPresent) {
@@ -84,7 +84,7 @@ class Pinboard(
         }
     }
 
-    fun getPinboardPost(message: Message): Mono<Message> {
+    private fun getPinboardPost(message: Message): Mono<Message> {
         return db.findPinboardPost(message.id.asLong())?.let {
             client.getMessageById(pinboardChannelId, Snowflake.of(it.id.value))
         }
