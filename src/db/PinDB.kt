@@ -42,6 +42,10 @@ class PinDB(val dbConfig: DBConfig) {
         }
     }
 
+    fun removePinning(message: Long) = transaction {
+        PinnedMessage.findById(message)?.delete()
+    }
+
     fun savePinboardPost(guild: Long, post: Long, message: Long, content: String, imageUrl: String? = null) =
         transaction {
             val existing = PinboardPost.findById(post)
@@ -58,6 +62,10 @@ class PinDB(val dbConfig: DBConfig) {
                     this.imageUrl = imageUrl
                 }
         }
+
+    fun removePinboardPost(post: Long) = transaction {
+        PinboardPost.findById(post)?.delete()
+    }
 
     fun findPinboardPost(originalMessage: Long) = transaction {
         PinboardPost.find {

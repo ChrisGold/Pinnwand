@@ -33,31 +33,59 @@ class Pinboard(
 
     fun addReact(addEvent: ReactionAddEvent) = addEvent.message.subscribe { message ->
         logger.trace("Added react: $addEvent")
-        //Ignore non-user posters
+        updateBasedOnMessage(message)
+    }
+
+    fun removeReact(removeEvent: ReactionRemoveEvent) = removeEvent.message.subscribe { message ->
+        logger.trace("Removed react: $removeEvent")
+        updateBasedOnMessage(message)
+    }
+
+    private fun updateBasedOnMessage(message: Message) {
         val pins = countPins(message)
-        if (pins >= threshold && message.author.isPresent) {
-            val author = message.author.get()
-            message.attachments
-            logger.info(
-                "Pinning message: author = ${author.username}:\n" +
-                        "\tAttached: ${message.attachments}\n" +
-                        "\tEmbedded: ${message.embeds}\n" +
-                        "\tContent:  ${message.content.k}"
-            )
-            //Register post in DB
-            db.registerPinning(guildId.asLong(), message.id.asLong(), author.id.asLong(), pins)
-            getPinboardPost(message).subscribe { pinboardMessage ->
-                bindData(message, pins, pinboardMessage).subscribe()
+        //Ignore non-user posters
+        if (message.author.isPresent) {
+            //Message should be pinned
+            if (pins >= threshold) {
+                val author = message.author.get()
+                message.attachments
+                logger.info(
+                    "Pinning message: author = ${author.username}:\n" +
+                            "\tAttached: ${message.attachments}\n" +
+                            "\tEmbedded: ${message.embeds}\n" +
+                            "\tContent:  ${message.content.k}"
+                )
+                //Register post in DB
+                db.registerPinning(guildId.asLong(), message.id.asLong(), author.id.asLong(), pins)
+                getPinboardPost(message).subscribe { pinboardMessage ->
+                    bindData(message, pins, pinboardMessage).subscribe()
+                }
+            }
+            //Message should not be pinned
+            else {
+                removeMessage(message.id)
             }
         }
     }
 
-    fun removeReact(event: ReactionRemoveEvent?) {
-        logger.trace("Removed react: $event")
+    fun deleteMessage(deletionEvent: MessageDeleteEvent) {
+        logger.trace("Deleted message: $deletionEvent")
+        removeMessage(deletionEvent.messageId)
     }
 
-    fun deleteMessage(deletion: MessageDeleteEvent?) {
-        logger.trace("Deleted message: $deletion")
+    private fun removeMessage(messageId: Snowflake) {
+        //Check if message has been pinned before
+        val pinboardPost = db.findPinboardPost(messageId.asLong())
+        if (pinboardPost != null) {
+            val pinboardMessage = client.getMessageById(pinboardChannelId, Snowflake.of(pinboardPost.id.value))
+            pinboardMessage.map { message ->
+                message.delete().subscribe {
+                    logger.trace("Deleting $message")
+                    db.removePinning(messageId.asLong())
+                    db.removePinboardPost(message.id.asLong())
+                }
+            }.subscribe()
+        }
     }
 
     fun getPinboardPost(message: Message): Mono<Message> {
