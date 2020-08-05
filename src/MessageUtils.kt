@@ -36,6 +36,26 @@ fun decomposeLink(link: String): MessageData {
     return MessageData(guild, channel, message)
 }
 
+fun formatLeaderboard(list: List<LeaderboardEntry>): String {
+    val content = StringBuilder()
+
+    if (list.isEmpty()) {
+        return "<empty>"
+    }
+
+    list.forEachIndexed { i, (author, pinCount) ->
+        val pos = (i + 1).toString()
+        content.append(pos)
+        content.append(": ")
+        content.append(mentionUser(author))
+        content.append(" (")
+        content.append(pinCount)
+        content.append(")\n")
+    }
+
+    return content.toString()
+}
+
 fun mentionUser(user: Snowflake?): String = "<@!${user?.asString()}>"
 
 val Long.sf: Snowflake

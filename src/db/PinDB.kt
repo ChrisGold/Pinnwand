@@ -1,11 +1,15 @@
 package db
 
 import DBConfig
+import LeaderboardEntry
 import Pinboard
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
+import sf
 import java.sql.Connection
 
 class PinDB(val dbConfig: DBConfig) {
@@ -71,6 +75,26 @@ class PinDB(val dbConfig: DBConfig) {
         PinboardPost.find {
             PinboardPosts.message eq originalMessage
         }.toList().getOrNull(0)
+    }
+
+    fun tally(guildId: Long) = transaction {
+        val results = PinnedMessages
+            .slice(PinnedMessages.author, PinnedMessages.pinCount.sum(), PinnedMessages.guild)
+            .select {
+                PinnedMessages.guild eq guildId
+            }.execute(this)
+        val list = ArrayList<LeaderboardEntry>()
+        results?.let {
+            while (it.next()) {
+                //Remember: cursor fields are 1-indexed
+                val author = it.getLong(1)
+                val tally = it.getInt(2)
+                list.add(LeaderboardEntry(author.sf, tally))
+            }
+        }
+        //Maybe do this as an SQL order-by
+        list.sortByDescending { it.totalPins }
+        list
     }
 }
 

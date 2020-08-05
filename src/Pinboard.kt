@@ -1,7 +1,9 @@
 import db.PinDB
 import discord4j.core.DiscordClient
+import discord4j.core.`object`.entity.Channel
 import discord4j.core.`object`.entity.Message
 import discord4j.core.`object`.entity.MessageChannel
+import discord4j.core.`object`.entity.TextChannel
 import discord4j.core.`object`.reaction.ReactionEmoji
 import discord4j.core.`object`.util.Snowflake
 import discord4j.core.event.domain.message.MessageDeleteEvent
@@ -71,6 +73,20 @@ class Pinboard(
     fun onDeleteMessage(deletionEvent: MessageDeleteEvent) {
         logger.trace("Deleted message: $deletionEvent")
         removeMessage(deletionEvent.messageId)
+    }
+
+    fun showLeaderboard(channelId: Snowflake) = client.getChannelById(channelId).subscribe { channel ->
+        if (channel.type == Channel.Type.GUILD_TEXT) {
+            channel as TextChannel
+            val leaderboard = db.tally(guildId.asLong())
+            val content = formatLeaderboard(leaderboard)
+            channel.createMessage { mcs ->
+                mcs.setEmbed {
+                    it.setDescription("Pinnwand Leaderboard")
+                    it.addField("#", content, true)
+                }
+            }.subscribe()
+        }
     }
 
     private fun removeMessage(messageId: Snowflake) {

@@ -1,5 +1,6 @@
 import discord4j.core.`object`.reaction.ReactionEmoji
 import discord4j.core.`object`.util.Snowflake
+import discord4j.core.event.domain.message.MessageCreateEvent
 import discord4j.core.event.domain.message.MessageDeleteEvent
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
@@ -32,6 +33,12 @@ fun main(args: Array<String>) {
     client.eventDispatcher.on(MessageDeleteEvent::class.java).subscribe { deletion ->
         //MessageDeleteEvent doesn't include the guild, so we send this event to every guild we have
         pinboards.values.forEach { it.onDeleteMessage(deletion) }
+    }
+
+    client.eventDispatcher.on(MessageCreateEvent::class.java).filter {
+        it.message.content.k?.startsWith("*leaderboard") ?: false
+    }.subscribe { creation ->
+        onGuild(creation.guildId.k) { showLeaderboard(creation.message.channelId) }
     }
 
     //Login
