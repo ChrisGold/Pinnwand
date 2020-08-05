@@ -20,18 +20,18 @@ fun main(args: Array<String>) {
 
     //Listen to react events
     client.eventDispatcher.on(ReactionAddEvent::class.java).subscribe { event ->
-        onGuild(event.guildId.k) { addReact(event) }
+        onGuild(event.guildId.k) { onAddReact(event) }
     }
 
     //Listen to remove-react events
     client.eventDispatcher.on(ReactionRemoveEvent::class.java).subscribe { event ->
-        onGuild(event.guildId.k) { removeReact(event) }
+        onGuild(event.guildId.k) { onRemoveReact(event) }
     }
 
     //Listen to deleted messages
     client.eventDispatcher.on(MessageDeleteEvent::class.java).subscribe { deletion ->
         //MessageDeleteEvent doesn't include the guild, so we send this event to every guild we have
-        pinboards.values.forEach { it.deleteMessage(deletion) }
+        pinboards.values.forEach { it.onDeleteMessage(deletion) }
     }
 
     //Login

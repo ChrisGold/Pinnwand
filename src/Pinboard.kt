@@ -31,12 +31,12 @@ class Pinboard(
         return it.reactions.find { isPinEmoji(it.emoji) }?.count ?: 0
     }
 
-    fun addReact(addEvent: ReactionAddEvent) = addEvent.message.subscribe { message ->
+    fun onAddReact(addEvent: ReactionAddEvent) = addEvent.message.subscribe { message ->
         logger.trace("Added react: $addEvent")
         updateBasedOnMessage(message)
     }
 
-    fun removeReact(removeEvent: ReactionRemoveEvent) = removeEvent.message.subscribe { message ->
+    fun onRemoveReact(removeEvent: ReactionRemoveEvent) = removeEvent.message.subscribe { message ->
         logger.trace("Removed react: $removeEvent")
         updateBasedOnMessage(message)
     }
@@ -68,7 +68,7 @@ class Pinboard(
         }
     }
 
-    fun deleteMessage(deletionEvent: MessageDeleteEvent) {
+    fun onDeleteMessage(deletionEvent: MessageDeleteEvent) {
         logger.trace("Deleted message: $deletionEvent")
         removeMessage(deletionEvent.messageId)
     }
