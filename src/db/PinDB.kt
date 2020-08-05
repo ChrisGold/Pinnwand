@@ -20,9 +20,7 @@ class PinDB(dbConfig: DBConfig) {
         TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_SERIALIZABLE
         transaction(db) {
             //Ensure that all tables are present
-            SchemaUtils.createMissingTablesAndColumns(Guilds)
-            SchemaUtils.createMissingTablesAndColumns(PinnedMessages)
-            SchemaUtils.createMissingTablesAndColumns(PinboardPosts)
+            SchemaUtils.createMissingTablesAndColumns(Guilds, PinnedMessages, PinboardPosts)
         }
     }
 
