@@ -22,6 +22,7 @@ dependencies {
     implementation group: "org.jetbrains.exposed", name: "exposed-dao", version: "0.25.1"
     implementation group: "org.jetbrains.exposed", name: "exposed-jdbc", version: "0.25.1"
     api "org.xerial:sqlite-jdbc:3.21.0.1"
+    api "mysql:mysql-connector-java:8.0.21"
     implementation 'com.discord4j:discord4j-core:3.0.9'
     api group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.12.1'
     api group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.12.1'
