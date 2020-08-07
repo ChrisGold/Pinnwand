@@ -9,7 +9,9 @@ import discord4j.core.`object`.util.Snowflake
 import discord4j.core.event.domain.message.MessageDeleteEvent
 import discord4j.core.event.domain.message.ReactionAddEvent
 import discord4j.core.event.domain.message.ReactionRemoveEvent
+import discord4j.rest.http.client.ClientException
 import reactor.core.publisher.Mono
+import java.net.URI
 
 class Pinboard(
     val client: DiscordClient,
@@ -91,7 +93,7 @@ class Pinboard(
 
     private fun removeMessage(messageId: Snowflake) {
         //Check if message has been pinned before
-        val pinboardPost = db.findPinboardPost(messageId.asLong())
+        val pinboardPost = db.findPinboardPostByOriginalMessage(messageId.asLong())
         if (pinboardPost != null) {
             val pinboardPostId = pinboardPost.id.value
             db.removePinning(messageId.asLong())
@@ -101,11 +103,66 @@ class Pinboard(
     }
 
     private fun getPinboardPost(message: Message): Mono<Message> {
-        return db.findPinboardPost(message.id.asLong())?.let {
+        return db.findPinboardPostByOriginalMessage(message.id.asLong())?.let {
             client.getMessageById(pinboardChannelId, Snowflake.of(it.id.value))
         }
             ?: pinboardChannel.createEmptyMessage().doOnSuccess {
                 db.savePinboardPost(guildId.asLong(), it.id.asLong(), message.id.asLong(), message.content.k.orEmpty())
             }
+    }
+
+    fun rescanPinboard() {
+        val pinboardPostMessages = pinboardChannel.allPinboardPostMessages()
+        pinboardPostMessages.filter {
+            db.findPinboardPostById(it.id.asLong()) == null
+        }.subscribe { pinboardPostMessage ->
+            val link = extractOriginalMessage(pinboardPostMessage)
+            link?.let {
+                client.getMessageById(link.channelId, link.messageId).doOnError {
+                    if ((it as ClientException?)?.status?.code() == 404) {
+                        logger.info("Old message deleted: $pinboardPostMessage")
+                        pinboardPostMessage.delete()
+                    }
+                }.subscribe { message ->
+                    val author = message.author.k
+                    logger.info(
+                        "Found old message: author = ${author?.username}:\n" +
+                                "\tTimestamp: ${message.timestamp.toString()}\n" +
+                                "\tAttached: ${message.attachments}\n" +
+                                "\tEmbedded: ${message.embeds}\n" +
+                                "\tContent:  ${message.content.k}"
+                    )
+                    relinkPost(pinboardPostMessage.id, message.channelId, message.id)
+                }
+            }
+        }
+    }
+
+    private fun relinkPost(postId: Snowflake, messageChannelId: Snowflake, messageId: Snowflake) {
+        client.getMessageById(messageChannelId, messageId).subscribe { message ->
+            val author = message.author.k ?: return@subscribe
+            val pins = countPins(message)
+            db.registerPinning(guildId.asLong(), message.id.asLong(), author.id.asLong(), pins)
+            db.savePinboardPost(guildId.asLong(), postId.asLong(), message.id.asLong(), message.content.k.orEmpty())
+            updateBasedOnMessage(message)
+        }
+    }
+
+    data class MessageLink(val guildId: Snowflake, val channelId: Snowflake, val messageId: Snowflake)
+
+    private fun extractOriginalMessage(pinboardPostMessage: Message): MessageLink? {
+        try {
+            val embed = pinboardPostMessage.embeds.getOrNull(0) ?: return null
+            val description = embed.description.k ?: return null
+            val linkTitle = "[Link to Post]("
+            val linkContentIndex = description.indexOf(linkTitle) + linkTitle.length
+            val linkContentEnd = description.indexOf(')', linkContentIndex)
+            val linkContent = description.substring(linkContentIndex, linkContentEnd)
+            val path = URI(linkContent).path
+            val components = path.split('/')
+            return MessageLink(Snowflake.of(components[2]), Snowflake.of(components[3]), Snowflake.of(components[4]))
+        } catch (ex: Exception) {
+            return null
+        }
     }
 }

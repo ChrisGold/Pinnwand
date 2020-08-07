@@ -35,10 +35,13 @@ fun main(args: Array<String>) {
         pinboards.values.forEach { it.onDeleteMessage(deletion) }
     }
 
-    client.eventDispatcher.on(MessageCreateEvent::class.java).filter {
-        it.message.content.k?.startsWith("*leaderboard") ?: false
-    }.subscribe { creation ->
-        onGuild(creation.guildId.k) { showLeaderboard(creation.message.channelId) }
+    client.eventDispatcher.on(MessageCreateEvent::class.java).subscribe { creation ->
+        val content = creation.message.content.k ?: return@subscribe
+        if (content.startsWith("*leaderboard")) {
+            onGuild(creation.guildId.k) { showLeaderboard(creation.message.channelId) }
+        } else if (content.startsWith("*rescan pinboard")) {
+            onGuild(creation.guildId.k) { rescanPinboard() }
+        }
     }
 
     //Login

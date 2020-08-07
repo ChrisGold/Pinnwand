@@ -65,11 +65,15 @@ class PinDB(dbConfig: DBConfig) {
                 }
         }
 
+    fun findPinboardPostById(post: Long) = transaction {
+        PinboardPost.findById(post)
+    }
+
     fun removePinboardPost(post: Long) = transaction {
         PinboardPost.findById(post)?.delete()
     }
 
-    fun findPinboardPost(originalMessage: Long) = transaction {
+    fun findPinboardPostByOriginalMessage(originalMessage: Long) = transaction {
         PinboardPost.find {
             PinboardPosts.message eq originalMessage
         }.toList().getOrNull(0)

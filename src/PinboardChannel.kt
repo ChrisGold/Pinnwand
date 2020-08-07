@@ -2,6 +2,7 @@ import discord4j.core.DiscordClient
 import discord4j.core.`object`.entity.Message
 import discord4j.core.`object`.entity.MessageChannel
 import discord4j.core.`object`.util.Snowflake
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
 class PinboardChannel(val client: DiscordClient, val guildId: Snowflake, val channel: MessageChannel) {
@@ -40,6 +41,14 @@ class PinboardChannel(val client: DiscordClient, val guildId: Snowflake, val cha
                 embed.setFooter("$pin $pinCount pushpins", null)
                 imageUrl?.let { embed.setImage(it) }
             }
+        }
+    }
+
+    fun allPinboardPostMessages(): Flux<Message> {
+        val selfId = client.selfId.k ?: return Flux.empty()
+        val lastMessage = channel.lastMessageId.k ?: return Flux.empty()
+        return channel.getMessagesBefore(lastMessage).filter {
+            it.author.k?.id == selfId
         }
     }
 }
