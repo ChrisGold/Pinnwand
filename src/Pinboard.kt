@@ -78,17 +78,18 @@ class Pinboard(
         removeMessage(deletionEvent.messageId)
     }
 
-    fun showLeaderboard(channelId: Snowflake) = client.getChannelById(channelId).subscribe { channel ->
-        if (channel.type == Channel.Type.GUILD_TEXT) {
-            channel as TextChannel
-            val leaderboard = db.tally(guildId.asLong())
-            val content = formatLeaderboard(leaderboard)
-            logger.info("Leaderboard: \n$content")
-            channel.createMessage { mcs ->
-                mcs.setEmbed {
-                    it.setDescription("Pinnwand Leaderboard")
-                    it.addField("#", content.substring(0, min(content.length, 1000)), true)
-                }
+    fun showLeaderboard(channelId: Snowflake, startingPlace: Int) =
+        client.getChannelById(channelId).subscribe { channel ->
+            if (channel.type == Channel.Type.GUILD_TEXT) {
+                channel as TextChannel
+                val leaderboard = db.tally(guildId.asLong())
+                val content = formatLeaderboard(leaderboard, 20, startingPlace)
+                logger.info("Leaderboard: \n$content")
+                channel.createMessage { mcs ->
+                    mcs.setEmbed {
+                        it.setDescription("Pinnwand Leaderboard")
+                        it.addField("#", content.substring(0, min(content.length, 1000)), true)
+                    }
             }.subscribe()
         }
     }

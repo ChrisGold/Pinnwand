@@ -38,7 +38,9 @@ fun main(args: Array<String>) {
     client.eventDispatcher.on(MessageCreateEvent::class.java).subscribe { creation ->
         val content = creation.message.content.k ?: return@subscribe
         if (content.startsWith("*leaderboard")) {
-            onGuild(creation.guildId.k) { showLeaderboard(creation.message.channelId) }
+            val sections = content.trim().split(' ')
+            val place = sections.getOrNull(1)?.toInt() ?: 0
+            onGuild(creation.guildId.k) { showLeaderboard(creation.message.channelId, place) }
         } else if (content.startsWith("*rescan pinboard")) {
             onGuild(creation.guildId.k) { rescanPinboard() }
         }

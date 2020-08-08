@@ -36,21 +36,23 @@ fun decomposeLink(link: String): MessageData {
     return MessageData(guild, channel, message)
 }
 
-fun formatLeaderboard(list: List<LeaderboardEntry>): String {
+fun formatLeaderboard(list: List<LeaderboardEntry>, limit: Int, offset: Int): String {
     val content = StringBuilder()
 
     if (list.isEmpty()) {
         return "<empty>"
     }
 
-    list.subList(0, 40).forEachIndexed { i, (author, pinCount) ->
-        val pos = (i + 1).toString()
-        content.append(pos)
-        content.append(": ")
-        content.append(mentionUser(author))
-        content.append(" (")
-        content.append(pinCount)
-        content.append(")\n")
+    list.forEachIndexed { i, (author, pinCount) ->
+        if (i >= offset && i < offset + limit) {
+            val pos = (i + 1).toString()
+            content.append(pos)
+            content.append(": ")
+            content.append(mentionUser(author))
+            content.append(" (")
+            content.append(pinCount)
+            content.append(")\n")
+        }
     }
 
     return content.toString()
