@@ -12,6 +12,7 @@ import discord4j.core.event.domain.message.ReactionRemoveEvent
 import discord4j.rest.http.client.ClientException
 import reactor.core.publisher.Mono
 import java.net.URI
+import kotlin.math.min
 
 class Pinboard(
     val client: DiscordClient,
@@ -82,10 +83,11 @@ class Pinboard(
             channel as TextChannel
             val leaderboard = db.tally(guildId.asLong())
             val content = formatLeaderboard(leaderboard)
+            logger.info("Leaderboard: \n$content")
             channel.createMessage { mcs ->
                 mcs.setEmbed {
                     it.setDescription("Pinnwand Leaderboard")
-                    it.addField("#", content, true)
+                    it.addField("#", content.substring(0, min(content.length, 1000)), true)
                 }
             }.subscribe()
         }

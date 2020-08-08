@@ -43,7 +43,7 @@ fun formatLeaderboard(list: List<LeaderboardEntry>): String {
         return "<empty>"
     }
 
-    list.forEachIndexed { i, (author, pinCount) ->
+    list.subList(0, 40).forEachIndexed { i, (author, pinCount) ->
         val pos = (i + 1).toString()
         content.append(pos)
         content.append(": ")
