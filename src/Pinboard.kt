@@ -90,9 +90,9 @@ class Pinboard(
                         it.setDescription("Pinnwand Leaderboard")
                         it.addField("#", content.substring(0, min(content.length, 1000)), true)
                     }
-            }.subscribe()
+                }.subscribe()
+            }
         }
-    }
 
     private fun removeMessage(messageId: Snowflake) {
         //Check if message has been pinned before
@@ -138,6 +138,21 @@ class Pinboard(
                     relinkPost(pinboardPostMessage.id, message.channelId, message.id)
                 }
             }
+        }
+    }
+
+    fun topPosts(channelId: Snowflake, postCount: Int) = client.getChannelById(channelId).subscribe { channel ->
+        if (channel.type == Channel.Type.GUILD_TEXT) {
+            channel as TextChannel
+            val leaderboard = db.topPosts(guildId.asLong(), 10)
+            val content = formatTopPosts(leaderboard)
+            logger.info("Top Posts: \n$content")
+            channel.createMessage { mcs ->
+                mcs.setEmbed {
+                    it.setDescription("Pinnwand Top Posts")
+                    it.addField("#", content.substring(0, min(content.length, 1000)), true)
+                }
+            }.subscribe()
         }
     }
 

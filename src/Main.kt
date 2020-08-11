@@ -43,6 +43,8 @@ fun main(args: Array<String>) {
             onGuild(creation.guildId.k) { showLeaderboard(creation.message.channelId, place) }
         } else if (content.startsWith("*rescan pinboard")) {
             onGuild(creation.guildId.k) { rescanPinboard() }
+        } else if (content.startsWith("*top posts")) {
+            onGuild(creation.guildId.k) { topPosts(creation.message.channelId, 10) }
         }
     }
 

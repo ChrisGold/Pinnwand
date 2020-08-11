@@ -3,10 +3,8 @@ package db
 import DBConfig
 import LeaderboardEntry
 import Pinboard
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.select
-import org.jetbrains.exposed.sql.sum
+import TopPostEntry
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import sf
@@ -98,6 +96,29 @@ class PinDB(dbConfig: DBConfig) {
         //Maybe do this as an SQL order-by
         list.sortByDescending { it.totalPins }
         list
+    }
+
+    fun topPosts(guildId: Long, postCount: Int) = transaction {
+        val results = PinnedMessages
+            .slice(PinnedMessages.id, PinnedMessages.author, PinnedMessages.pinCount, PinnedMessages.guild)
+            .select {
+                PinnedMessages.guild eq guildId
+            }
+            .orderBy(PinnedMessages.pinCount, SortOrder.DESC)
+            .limit(postCount)
+            .execute(this)
+        val topPosts = ArrayList<TopPostEntry>(postCount)
+
+        results?.let {
+            while (it.next()) {
+                //Remember: cursor fields are 1-indexed
+                val id = it.getLong(1)
+                val author = it.getLong(2)
+                val pinCount = it.getInt(3)
+                topPosts.add(TopPostEntry(id.sf, author.sf, pinCount))
+            }
+        }
+        topPosts
     }
 }
 
