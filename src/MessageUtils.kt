@@ -60,7 +60,7 @@ fun formatLeaderboard(list: List<LeaderboardEntry>, limit: Int, offset: Int): St
 
 fun formatTopPosts(list: List<TopPostEntry>): String = list.asSequence().withIndex().joinToString("\n") { (id, entry) ->
     val (message, author, totalPins) = entry
-    "$id: ${mentionUser(author)} $totalPins Pins"
+    "${id + 1}: ${mentionUser(author)} $totalPins Pins\n${message}"
 }
 
 fun mentionUser(user: Snowflake?): String = "<@!${user?.asString()}>"

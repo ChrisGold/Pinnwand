@@ -99,8 +99,17 @@ class PinDB(dbConfig: DBConfig) {
     }
 
     fun topPosts(guildId: Long, postCount: Int) = transaction {
-        val results = PinnedMessages
-            .slice(PinnedMessages.id, PinnedMessages.author, PinnedMessages.pinCount, PinnedMessages.guild)
+        val results = PinnedMessages.join(
+            PinboardPosts,
+            JoinType.LEFT,
+            additionalConstraint = { PinnedMessages.id eq PinboardPosts.message })
+            .slice(
+                PinnedMessages.id,
+                PinnedMessages.author,
+                PinnedMessages.pinCount,
+                PinboardPosts.content,
+                PinnedMessages.guild
+            )
             .select {
                 PinnedMessages.guild eq guildId
             }
@@ -112,10 +121,11 @@ class PinDB(dbConfig: DBConfig) {
         results?.let {
             while (it.next()) {
                 //Remember: cursor fields are 1-indexed
-                val id = it.getLong(1)
+                //val id = it.getLong(1)
                 val author = it.getLong(2)
                 val pinCount = it.getInt(3)
-                topPosts.add(TopPostEntry(id.sf, author.sf, pinCount))
+                val content = it.getString(4)
+                topPosts.add(TopPostEntry(content, author.sf, pinCount))
             }
         }
         topPosts
