@@ -62,7 +62,7 @@ class Pinboard(
                 )
                 //Register post in DB
                 db.registerPinning(guildId.asLong(), message.id.asLong(), author.id.asLong(), pins)
-                getPinboardPost(message).subscribe { pinboardMessage ->
+                getPinboardPost(message, author.id).subscribe { pinboardMessage ->
                     pinboardChannel.bindData(message, pins, pinboardMessage).subscribe()
                 }
             }
@@ -105,11 +105,11 @@ class Pinboard(
         }
     }
 
-    private fun getPinboardPost(message: Message): Mono<Message> {
+    private fun getPinboardPost(message: Message, authorId: Snowflake? = null): Mono<Message> {
         return db.findPinboardPostByOriginalMessage(message.id.asLong())?.let {
             client.getMessageById(pinboardChannelId, Snowflake.of(it.id.value))
         }
-            ?: pinboardChannel.createEmptyMessage().doOnSuccess {
+            ?: pinboardChannel.createNewMessage(authorId).doOnSuccess {
                 db.savePinboardPost(guildId.asLong(), it.id.asLong(), message.id.asLong(), message.content.k.orEmpty())
             }
     }

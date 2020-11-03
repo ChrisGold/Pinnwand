@@ -10,6 +10,16 @@ class PinboardChannel(val client: DiscordClient, val guildId: Snowflake, val cha
         return channel.createMessage("...")
     }
 
+    fun createNewMessage(userId: Snowflake? = null): Mono<Message> {
+        return when (userId) {
+            null -> createEmptyMessage()
+            else -> {
+                val mention = mentionUser(userId)
+                channel.createMessage("A post from $mention was pinned.")
+            }
+        }
+    }
+
     fun deletePost(postId: Snowflake) {
         channel.getMessageById(postId).subscribe { pinboardMessage ->
             logger.trace("Deleting $pinboardMessage")
