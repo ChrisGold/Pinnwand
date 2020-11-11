@@ -45,6 +45,14 @@ fun main(args: Array<String>) {
             onGuild(creation.guildId.k) { rescanPinboard() }
         } else if (content.startsWith("*top posts")) {
             onGuild(creation.guildId.k) { topPosts(creation.message.channelId, 10) }
+        } else if (content.startsWith("*nostalgia")) {
+            val arguments = content.trim().split(' ')
+            val nostalgia = if (arguments.size >= 4) try {
+                nostalgia(arguments[0], arguments[1], arguments[2])
+            } catch (ex: Exception) {
+                "Parsing Error!"
+            } else "Wrong number of arguments!"
+            onGuild(creation.guildId.k) { sendMessage(creation.message.channelId, nostalgia) }
         }
     }
 

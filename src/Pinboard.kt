@@ -94,6 +94,15 @@ class Pinboard(
             }
         }
 
+    fun sendMessage(channelId: Snowflake, msg: String) {
+        client.getChannelById(channelId).subscribe { channel ->
+            if (channel.type == Channel.Type.GUILD_TEXT) {
+                channel as TextChannel
+                channel.createMessage(msg).subscribe()
+            }
+        }
+    }
+
     private fun removeMessage(messageId: Snowflake) {
         //Check if message has been pinned before
         val pinboardPost = db.findPinboardPostByOriginalMessage(messageId.asLong())
