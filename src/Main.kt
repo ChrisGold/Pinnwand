@@ -48,7 +48,7 @@ fun main(args: Array<String>) {
         } else if (content.startsWith("*nostalgia")) {
             val arguments = content.trim().split(' ')
             val nostalgia = if (arguments.size >= 4) try {
-                nostalgia(arguments[0], arguments[1], arguments[2])
+                nostalgia(arguments[1], arguments[2], arguments[3])
             } catch (ex: Exception) {
                 "Parsing Error!"
             } else "Wrong number of arguments!"
