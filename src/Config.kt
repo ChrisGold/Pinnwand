@@ -22,12 +22,19 @@ data class Config(val client: DiscordClient, val db: PinDB, val pinboards: Map<S
             }
             val pinboardConfigs = configData.guilds
             val pinDB = PinDB(configData.database)
-            val pinboards = pinboardConfigs.map {
+            val pinboards = pinboardConfigs.mapNotNull {
                 val guild = it.guild
                 val guildId = Snowflake.of(it.guildId)
                 val pinboardChannelId = Snowflake.of(it.pinboardChannel)
                 val pin = it.pin
-                guildId to Pinboard(client, pinDB, guild, guildId, pinboardChannelId, pin, it.threshold)
+                val pinboard = try {
+                    Pinboard(client, pinDB, guild, guildId, pinboardChannelId, pin, it.threshold)
+                } catch (ex: Exception) {
+                    println("Could not initialize $guild")
+                    ex.printStackTrace()
+                    null
+                }
+                pinboard?.let { guildId to pinboard }
             }.toMap()
             pinDB.registerGuilds(pinboards.values)
             return Config(client, pinDB, pinboards)
