@@ -108,8 +108,8 @@ class Pinboard(
         val pinboardPost = db.findPinboardPostByOriginalMessage(messageId.asLong())
         if (pinboardPost != null) {
             val pinboardPostId = pinboardPost.id.value
-            db.removePinning(messageId.asLong())
             db.removePinboardPost(pinboardPostId)
+            db.removePinning(messageId.asLong())
             pinboardChannel.deletePost(pinboardPostId.sf)
         }
     }
