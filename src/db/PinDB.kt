@@ -52,13 +52,11 @@ class PinDB(dbConfig: DBConfig) {
             existing?.apply {
                 this.guild = Guild.findById(guild)!!
                 this.message = PinnedMessage.findById(message)!!
-                this.content = content
                 this.imageUrl = imageUrl
             }
                 ?: PinboardPost.new(post) {
                     this.guild = Guild.findById(guild)!!
                     this.message = PinnedMessage.findById(message)!!
-                    this.content = content
                     this.imageUrl = imageUrl
                 }
         }
@@ -107,7 +105,6 @@ class PinDB(dbConfig: DBConfig) {
                 PinnedMessages.id,
                 PinnedMessages.author,
                 PinnedMessages.pinCount,
-                PinboardPosts.content,
                 PinnedMessages.guild
             )
             .select {
