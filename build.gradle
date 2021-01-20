@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'eu.goldapp'
-version 'v2.4.4'
+version '2.6.0'
 
 sourceCompatibility = 1.8
 

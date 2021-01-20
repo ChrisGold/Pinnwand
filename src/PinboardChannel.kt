@@ -34,7 +34,10 @@ class PinboardChannel(val client: DiscordClient, val guildId: Snowflake, val cha
     ): Mono<Message> {
         val channelId = pinnedMessage.channelId
         val messageId = pinnedMessage.id
-        val content = pinnedMessage.content.k ?: "<empty>"
+        val content = pinnedMessage.content.k ?: ""
+        val readableContent =
+            if (content.length > 999) content.substring(0..999) + Typography.ellipsis
+            else content
         val imageUrl = pinnedMessage.attachments.toList().getOrNull(0)?.url ?: pinnedMessage.embeds.getOrNull(0)?.url?.k
         val link = channelId.let {
             "https://discordapp.com/channels/${guildId.asString()}/${channelId.asString()}/${messageId.asString()}"
@@ -45,7 +48,7 @@ class PinboardChannel(val client: DiscordClient, val guildId: Snowflake, val cha
             it.setContent("A post from $mention was pinned.")
             it.setEmbed { embed ->
                 embed.setDescription("[Link to Post]($link)")
-                embed.addField("Content", content, false)
+                embed.addField("Content", readableContent, false)
                 embed.addField("Author", mention, true)
                 embed.addField("Channel", channel, true)
                 embed.setFooter("$pin $pinCount pushpins", null)

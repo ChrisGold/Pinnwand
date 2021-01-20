@@ -8,10 +8,12 @@ import discord4j.gateway.retry.RetryOptions
 import org.apache.logging.log4j.LogManager
 import reactor.core.scheduler.Schedulers
 import java.io.File
+import java.io.PrintStream
 import java.time.Duration
 import java.util.*
 
 fun main(args: Array<String>) {
+    initLogging()
     //Read config and build Discord Client
     val configFile = File((args.getOrNull(0) ?: "pinbot.config.yaml"))
     val (client, _, pinboards) = Config.read(configFile) {
@@ -75,3 +77,23 @@ val <T> T?.o get() = Optional.ofNullable(this)
 
 const val pin = "\uD83D\uDCCC"
 val logger = LogManager.getLogger("eu.goldapp.Pinnwand")
+
+fun initLogging() {
+    fun errorProxy(realStream: PrintStream) = object : PrintStream(realStream) {
+        override fun print(string: String) {
+            super.print(string);
+            val logger = LogManager.getLogger()
+            logger.error(string)
+        }
+    }
+
+    fun stdProxy(realStream: PrintStream) = object : PrintStream(realStream) {
+        override fun print(string: String) {
+            super.print(string);
+            val logger = LogManager.getLogger()
+            logger.info(string)
+        }
+    }
+    System.setOut(stdProxy(System.out))
+    System.setErr(errorProxy(System.err))
+}

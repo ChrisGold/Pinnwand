@@ -53,12 +53,16 @@ class Pinboard(
             //Message should be pinned
             if (pins >= threshold) {
                 val author = message.author.get()
+                val content = message.content.k ?: ""
+                val readableContent =
+                    if (content.length > 999) content.substring(0..999) + Typography.ellipsis
+                    else content
                 message.attachments
                 logger.info(
                     "Pinning message: author = ${author.username}:\n" +
                             "\tAttached: ${message.attachments}\n" +
                             "\tEmbedded: ${message.embeds}\n" +
-                            "\tContent:  ${message.content.k}"
+                            "\tContent:  $readableContent"
                 )
                 //Register post in DB
                 db.registerPinning(guildId.asLong(), message.id.asLong(), author.id.asLong(), pins)
