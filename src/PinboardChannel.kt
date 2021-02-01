@@ -39,6 +39,7 @@ class PinboardChannel(val client: DiscordClient, val guildId: Snowflake, val cha
             if (content.length > 999) content.substring(0..999) + Typography.ellipsis
             else content
         val imageUrl = pinnedMessage.attachments.toList().getOrNull(0)?.url ?: pinnedMessage.embeds.getOrNull(0)?.url?.k
+        logger.info("Extracted Image URL: $imageUrl")
         val link = channelId.let {
             "https://discordapp.com/channels/${guildId.asString()}/${channelId.asString()}/${messageId.asString()}"
         }
