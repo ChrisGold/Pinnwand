@@ -43,7 +43,8 @@ class PinboardChannel(val client: DiscordClient, val guildId: Snowflake, val cha
             "https://discordapp.com/channels/${guildId.asString()}/${channelId.asString()}/${messageId.asString()}"
         }
         val channel = "<#${channelId.asString()}>"
-        val mention = mentionUser(pinnedMessage.author.k!!.id)
+        val author = pinnedMessage.author.k!!
+        val mention = mentionUser(author.id)
         return pinboardPost.edit {
             it.setContent("A post from $mention was pinned.")
             it.setEmbed { embed ->
@@ -54,6 +55,14 @@ class PinboardChannel(val client: DiscordClient, val guildId: Snowflake, val cha
                 embed.setFooter("$pin $pinCount pushpins", null)
                 imageUrl?.let { embed.setImage(it) }
             }
+        }.doOnSuccess {
+            logger.info(
+                """
+                    Bound message from ${nameUser(author)} with $pinCount pins in $channel:
+                    Image URL: $imageUrl
+                    $readableContent
+                """.trimIndent()
+            )
         }
     }
 

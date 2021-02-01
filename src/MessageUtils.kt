@@ -1,4 +1,5 @@
 import discord4j.core.`object`.entity.Message
+import discord4j.core.`object`.entity.User
 import discord4j.core.`object`.util.Snowflake
 import java.time.format.DateTimeFormatter
 import java.util.*
@@ -64,6 +65,8 @@ fun formatTopPosts(list: List<TopPostEntry>): String = list.asSequence().withInd
 }
 
 fun mentionUser(user: Snowflake?): String = "<@!${user?.asString()}>"
+
+fun nameUser(user: User) = "${user.username}#${user.discriminator}"
 
 val Long.sf: Snowflake
     get() = Snowflake.of(this)
