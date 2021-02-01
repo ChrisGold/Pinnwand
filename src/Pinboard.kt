@@ -53,7 +53,7 @@ class Pinboard(
             //Message should be pinned
             if (pins >= threshold) {
                 val author = message.author.get()
-                val content = message.content.k ?: ""
+                val content = message.content.k ?: Typography.ellipsis.toString()
                 val readableContent =
                     if (content.length > 999) content.substring(0..999) + Typography.ellipsis
                     else content
